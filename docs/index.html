@@ -1,0 +1,229 @@
+<meta charset="utf-8" emacsmode="-*- markdown -*-"><link rel="stylesheet" href="https://casual-effects.com/markdeep/latest/apidoc.css?">
+
+**Photoshop C++ Recipes**
+
+Hi.
+
+If you read the title of this document and are wondering if I'm going to be
+introducing some delicious recipes for your next weekend brunch, the answer is
+no. Instead, I'll be going over some seemingly innocuous tasks that you might
+find yourself doing should you ever have the unfortunate task of having to work
+on native Photoshop plugins.
+
+Just so you can know at a glance if this tutorial is for you, I'll be covering
+the following topics:
+
+* Getting started creating native (C++) Photoshop plugins in a minimalist manner;
+
+* Reading layer data directly within Photoshop entirely through C++ and
+  combining an Automation and a Filter plugin to make this happen;
+
+* Making our own GUI tools in Photoshop without going through CEP,
+  using [ImGui](https://github.com/ocornut/imgui);
+
+* Communicating between a traditional CEP panel in Photoshop and a native C++
+  plugin using Adobe native CSXS events;
+
+
+# Code Repository #
+
+All the source code for this tutorial is available [here](https://github.com/sonictk/ps_cpp_recipes).
+
+
+# Motivation #
+
+## Why write native plugins instead of going through CEP? ##
+
+If you've had any experience working with Photoshop development before, you'll
+likely be familar with the [Adobe CEP framework](https://github.com/Adobe-CEP),
+which is basically's Adobe idea of allowing developers to extend Photoshop
+through the "modern" set of web technologies, and being able to share those
+creations across the entire Adobe suite.
+
+Unfortunately (as with most over-complicated things in programming), while this
+sounds very nice in theory, it's an unmitigated disaster in practice. While I'll
+explain in detail later on, here's a brief list of bullet points:
+
+* For reasons which will be explained later, CEP is _slow_. It's to the point
+  where for certain operations (not even at scale), it's so slow in execution as
+  to be unusable.
+
+* Debugging the CEP JavaScript/Adobe JSX layers is incredibly time-consuming and
+  sometimes also impossible, depending on the exposed API calls you're
+  attempting to make. Also, if there's a bug, you likely will have no chance of
+  solving it on your own without Adobe's help (and good luck with that!).
+
+* It's JavaScript. Which probably sounded like a good idea to some product
+  manager back in the day, but now just serves to be a major pain even when
+  programming in it.
+
+
+# Requirements #
+
+This tutorial will focus on writing only the Windows version of any plugins,
+since Photoshop is only supported on Windows/OSX and really, the concepts I'm
+going to illustrate are OS-agnostic. However, in the event that I find it useful
+to cover information regarding those platforms, it will appear in the following
+format:
+
+!!! tip Crossing the platforms
+    Platform-specific information goes here.
+
+
+## What you will need ##
+
+- Windows 10 and Photoshop CC 2019/2020 or later.
+
+- A **C/C++ development environment** set up and ready to go. (If you want to see
+  what my Emacs setup looks like, it's
+  available [here](https://github.com/sonictk/lightweight-emacs).)
+
+- MSVC 2017 (Photoshop 2019).
+
+!!! warning MSVC Compiler versions
+    There's not much official information (if any) that I could find regarding
+    the recommended compiler versions that should be used to compile plugins for
+    each version of Photoshop. I've tested 2017 against Photoshop 2019 pretty
+    thoroughly and haven't found any major issues (I would assume 2019 would be
+    OK as well, since they are ABI-compatible).
+
+- The Adobe Photoshop SDK for your particular version of Photoshop.
+  They can be downloaded from the following location:
+  https://console.adobe.io/downloads (You'll need an Adobe account.)
+  Versions prior to CC 2014 may be downloaded from the following
+  location: https://www.adobe.com/devnet/photoshop/sdk.html
+
+
+## What you should know ##
+
+- **Competency with C/C++**. This tutorial will not focus on basics, and is
+  meant to be more of a quickstart guide for programmers already experienced
+  with C++ to dive into the specifics of Photoshop plugin development.
+
+- **Basic knowledge of JavaScript**. We will be writing a little JavaScript code
+  here and there (simply to demonstrate usage of CEP, since that is still to
+  date the only officially recommended way to create GUIs in Photoshop), so
+  you'll need to be able to grok the syntax.
+
+- **Basic knowledge of Photoshop**. Since we're going to be writing plugins for
+  it, it would be helpful if you knew what a layer was, for example, or what
+  a filter is.
+
+Let's get started with the various recipes. Feel free to skip ahead if you're
+not interested in a particular topic.
+
+
+# The Basics: Creating your first Photoshop plugin #
+
+This recipe will teach you how to create a native C++ Photoshop plugin from
+scratch and without involving an IDE; this will be as minimalist a
+setup as possible.
+
+## Getting the documentation ##
+
+The documentation for the Photoshop SDK is fairly old and hasn't been
+updated regularly in a while, but it's still useful in some ways. Your
+copy of the documentation (``documentation.html``) is included in the
+SDK that you downloaded.
+
+For initial reading, find the page on **Types of plug-in modules** and
+go over the different types of Photoshop plug-ins that are supported,
+and their corresponding limitations. Basically, Photoshop segregates
+the different types of plug-ins that one can write to extend the
+functionality of the host program, and each type of plug-in has a
+different entry point that Photoshop is expecting to call, along with
+a different defined file extension.
+
+For example, **filter** plug-ins (the kind that show up in the
+**Filter** menu, which basically run math operations on your layer's
+image pixels) have the entry point signature of:
+
+```
+DLLExport MACPASCAL void PluginMain(const int16_t selector,
+                                    FilterRecordPtr filterRecord,
+                                    long long *data,
+                                    int16_t *result);
+```
+
+and a file extension of ``.8bf``, whereas **automation** plug-ins have
+a different entry point that Photoshop calls:
+
+```
+DLLExport SPAPI SPErr AutoPluginMain(const char* caller,
+                                     const char* selector,
+                                     void* message);
+```
+
+and a file extension of ``.8li`` instead.
+
+If you're attempting to write one of the other types of plugins, I
+suggest taking a look at the sample code, also provided with the
+documentation.
+
+## Hello, world ##
+
+Let's go ahead and create our first Photoshop plugin. To make things
+simple, we'll be making an **Automation** plug-in, which is generally
+meant for tools or other, as the name implies, automated processes to
+occur on Photoshop documents.
+
+You can refer to the various samples within the SDK to see more about
+Automation plugins in general, but for the purposes of this tutorial,
+go ahead and create ``tutorial_automation_main.cpp``, and fill it with
+the following code:
+
+
+```
+SPBasicSuite *sSPBasic = NULL;
+
+
+SPErr UninitializePlugin()
+{
+	PIUSuitesRelease();
+	return status;
+}
+
+
+DLLExport SPAPI SPErr AutoPluginMain(const char* caller,
+									 const char* selector,
+									 void* message)
+{
+	SPErr status = kSPNoError;
+
+	SPMessageData *basicMessage = (SPMessageData *)message;
+
+	sSPBasic = basicMessage->basic;
+
+	if (sSPBasic->IsEqual(caller, kSPInterfaceCaller)) {
+		if (sSPBasic->IsEqual(selector, kSPInterfaceAboutSelector)) {
+			DoAbout(basicMessage->self, AboutID);
+		}
+
+		if (sSPBasic->IsEqual(selector, kSPInterfaceStartupSelector)) {
+			return kSPNoError;
+		}
+
+		if (sSPBasic->IsEqual(selector, kSPInterfaceShutdownSelector)) {
+			status = UninitializePlugin();
+		}
+	}
+
+	if (sSPBasic->IsEqual(caller, kPSPhotoshopCaller)) {
+		if (sSPBasic->IsEqual(selector, kPSDoIt)) {
+			PSActionsPlugInMessage *tmpMsg = (PSActionsPlugInMessage *)message;
+		}
+	}
+
+	return status;
+}
+```
+
+
+
+# Credits #
+
+* Tom Ruark, for assisting with some of my queries, cryptic though his replies were.
+
+
+<style class="fallback">body{visibility:hidden}</style><script>markdeepOptions={tocStyle:'medium'};</script>
+<!-- Markdeep: --><script src="https://casual-effects.com/markdeep/latest/markdeep.min.js?" charset="utf-8"></script>
