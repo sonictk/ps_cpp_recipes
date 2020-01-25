@@ -1,4 +1,4 @@
-<meta charset="utf-8" emacsmode="-*- markdown -*-"><link rel="stylesheet" href="https://casual-effects.com/markdeep/latest/apidoc.css?">
+<meta charset="utf-8" emacsmode="-*- markdown -*-"><link rel="stylesheet" href="apidoc_modified.css">
 
 **Photoshop C++ Recipes**
 
@@ -15,14 +15,20 @@ the following topics:
 
 * Getting started creating native (C++) Photoshop plugins in a minimalist manner;
 
-* Reading layer data directly within Photoshop entirely through C++ and
-  combining an Automation and a Filter plugin to make this happen;
+* Reading layer data directly within Photoshop entirely through C++;
+
+* Combining an Automation to run a "hidden" Filter plugin;
 
 * Making our own GUI tools in Photoshop without going through CEP,
   using [ImGui](https://github.com/ocornut/imgui);
 
 * Communicating between a traditional CEP panel in Photoshop and a native C++
   plugin using Adobe native CSXS events;
+
+Some of these recipes are already in the samples included in the SDK, but
+they're pretty obtuse and not necessarily implemented in an easy-to-understand
+manner (at least, it took me a while to grok them). Hopefully the recipes here
+will be far less bloated.
 
 
 # Code Repository #
@@ -32,7 +38,7 @@ All the source code for this tutorial is available [here](https://github.com/son
 
 # Motivation #
 
-## Why write native plugins instead of going through CEP? ##
+## Why not CEP instead? ##
 
 If you've had any experience working with Photoshop development before, you'll
 likely be familar with the [Adobe CEP framework](https://github.com/Adobe-CEP),
@@ -50,8 +56,9 @@ explain in detail later on, here's a brief list of bullet points:
 
 * Debugging the CEP JavaScript/Adobe JSX layers is incredibly time-consuming and
   sometimes also impossible, depending on the exposed API calls you're
-  attempting to make. Also, if there's a bug, you likely will have no chance of
-  solving it on your own without Adobe's help (and good luck with that!).
+  attempting to make. Also, if there's a bug in the CEP/JS layer itself, you
+  likely will have no chance of solving it on your own without Adobe's help (and
+  good luck with that!).
 
 * It's JavaScript. Which probably sounded like a good idea to some product
   manager back in the day, but now just serves to be a major pain even when
@@ -113,7 +120,7 @@ Let's get started with the various recipes. Feel free to skip ahead if you're
 not interested in a particular topic.
 
 
-# The Basics: Creating your first Photoshop plugin #
+# Recipe: Minimalist approach to Photoshop plug-ins #
 
 This recipe will teach you how to create a native C++ Photoshop plugin from
 scratch and without involving an IDE; this will be as minimalist a
@@ -123,7 +130,7 @@ setup as possible.
 
 The documentation for the Photoshop SDK is fairly old and hasn't been
 updated regularly in a while, but it's still useful in some ways. Your
-copy of the documentation (``documentation.html``) is included in the
+copy of the documentation (`documentation.html`) is included in the
 SDK that you downloaded.
 
 For initial reading, find the page on **Types of plug-in modules** and
@@ -145,7 +152,7 @@ DLLExport MACPASCAL void PluginMain(const int16_t selector,
                                     int16_t *result);
 ```
 
-and a file extension of ``.8bf``, whereas **automation** plug-ins have
+and a file extension of `.8bf`, whereas **automation** plug-ins have
 a different entry point that Photoshop calls:
 
 ```
@@ -154,7 +161,7 @@ DLLExport SPAPI SPErr AutoPluginMain(const char* caller,
                                      void* message);
 ```
 
-and a file extension of ``.8li`` instead.
+and a file extension of `.8li` instead.
 
 If you're attempting to write one of the other types of plugins, I
 suggest taking a look at the sample code, also provided with the
@@ -169,56 +176,200 @@ occur on Photoshop documents.
 
 You can refer to the various samples within the SDK to see more about
 Automation plugins in general, but for the purposes of this tutorial,
-go ahead and create ``tutorial_automation_main.cpp``, and fill it with
+go ahead and create `tutorial_automation_main.cpp`, and fill it with
 the following code:
 
 
-```
+```cpp
 SPBasicSuite *sSPBasic = NULL;
 
 
 SPErr UninitializePlugin()
 {
-	PIUSuitesRelease();
-	return status;
+    PIUSuitesRelease();
+    return status;
 }
 
 
 DLLExport SPAPI SPErr AutoPluginMain(const char* caller,
-									 const char* selector,
-									 void* message)
+                                     const char* selector,
+                                     void* message)
 {
-	SPErr status = kSPNoError;
+    SPErr status = kSPNoError;
 
-	SPMessageData *basicMessage = (SPMessageData *)message;
+    SPMessageData *basicMessage = (SPMessageData *)message;
 
-	sSPBasic = basicMessage->basic;
+    sSPBasic = basicMessage->basic;
 
-	if (sSPBasic->IsEqual(caller, kSPInterfaceCaller)) {
-		if (sSPBasic->IsEqual(selector, kSPInterfaceAboutSelector)) {
-			DoAbout(basicMessage->self, AboutID);
-		}
+    if (sSPBasic->IsEqual(caller, kSPInterfaceCaller)) {
+        if (sSPBasic->IsEqual(selector, kSPInterfaceAboutSelector)) {
+            DoAbout(basicMessage->self, AboutID);
+        }
 
-		if (sSPBasic->IsEqual(selector, kSPInterfaceStartupSelector)) {
-			return kSPNoError;
-		}
+        if (sSPBasic->IsEqual(selector, kSPInterfaceStartupSelector)) {
+            return kSPNoError;
+        }
 
-		if (sSPBasic->IsEqual(selector, kSPInterfaceShutdownSelector)) {
-			status = UninitializePlugin();
-		}
-	}
+        if (sSPBasic->IsEqual(selector, kSPInterfaceShutdownSelector)) {
+            status = UninitializePlugin();
+        }
+    }
 
-	if (sSPBasic->IsEqual(caller, kPSPhotoshopCaller)) {
-		if (sSPBasic->IsEqual(selector, kPSDoIt)) {
-			PSActionsPlugInMessage *tmpMsg = (PSActionsPlugInMessage *)message;
-		}
-	}
+    if (sSPBasic->IsEqual(caller, kPSPhotoshopCaller)) {
+        if (sSPBasic->IsEqual(selector, kPSDoIt)) {
+            PSActionsPlugInMessage *tmpMsg = (PSActionsPlugInMessage *)message;
+        }
+    }
 
-	return status;
+    return status;
 }
+```
+While things here should be fairly self-explanatory, I'll go over a couple of
+slightly important bits that are useful to keep in mind as you continue
+development:
+
+```cpp
+SPBasicSuite *sSPBasic = NULL;
 ```
 
 
+This seems rather innocuous, but is actually required; it's used for the
+new/delete operators that are used whenever you accquire or release what Adobe
+refers to as **suites**. Suites are essentially libraries of functionality that
+are specific to a product i.e. Photoshop would have its own suite, along with
+Illustrator. As mentioned, you accquire and release suites whenever you use the
+functionality from a specific suite.
+
+In this case, we release the suite when we unload the plugin, in the
+`UninitializePlugin` call.
+
+The next few lines of code are also fairly straightforward:
+
+```cpp
+    SPMessageData *basicMessage = (SPMessageData *)message;
+
+    sSPBasic = basicMessage->basic;
+
+    if (sSPBasic->IsEqual(caller, kSPInterfaceCaller)) {
+        if (sSPBasic->IsEqual(selector, kSPInterfaceAboutSelector)) {
+            DoAbout(basicMessage->self, AboutID);
+        }
+
+        if (sSPBasic->IsEqual(selector, kSPInterfaceStartupSelector)) {
+            return kSPNoError;
+        }
+
+        if (sSPBasic->IsEqual(selector, kSPInterfaceShutdownSelector)) {
+            status = UninitializePlugin();
+        }
+    }
+
+    if (sSPBasic->IsEqual(caller, kPSPhotoshopCaller)) {
+        if (sSPBasic->IsEqual(selector, kPSDoIt)) {
+            PSActionsPlugInMessage *tmpMsg = (PSActionsPlugInMessage *)message;
+        }
+    }
+```
+
+When Photoshop calls our `AutoPluginMain` entry point, you can see that it
+passes in a `message` parameter. This message is basically used to tell the
+plugin what context it's being called in, and thus allow the plugin to react
+accordingly. So we see that we check against `kSPInterfaceAboutSelector`,
+`kSPInterfaceStartupSelector`, `kSPInterfaceShutdownSelector`, and
+`kPSPhotoshopCaller` in order to decide what to do (where, of course, that last
+one means that the user just activated the plug-in from the Automation menu in
+the Photoshop UI). Nothing should be too mystical or obtuse here.
+
+You'll notice here that we actually haven't done any code that will do printing
+of "Hello world" or anything of the sort yet. That's because Photoshop is not a
+console application on Windows, and thus we won't actually see anything if we
+just `printf` our way around. So for now, let's just write some simple code to
+launch a message dialog with the necessary text:
+
+```cpp
+#include <Windows.h>
+#include <string.h>
+
+#define WIN32_MAX_CLASS_NAME_LENGTH 256
+
+SPBasicSuite *sSPBasic = NULL;
+HWND globalPSMainWindowHwnd = NULL;
+
+
+BOOL CALLBACK getPSMainWindowCB(HWND hwnd, LPARAM lParam)
+{
+    char windowClassName[WIN32_MAX_CLASS_NAME_LENGTH];
+    GetClassNameA(hwnd, (LPSTR)windowClassName, WIN32_MAX_CLASS_NAME_LENGTH);
+
+    if (strncmp(windowClassName, "Photoshop", WIN32_MAX_CLASS_NAME_LENGTH) == 0) {
+        globalPSMainWindowHwnd = hwnd;
+    }
+
+    return TRUE;
+}
+
+
+SPErr UninitializePlugin()
+{
+    PIUSuitesRelease();
+    return status;
+}
+
+
+DLLExport SPAPI SPErr AutoPluginMain(const char* caller,
+                                     const char* selector,
+                                     void* message)
+{
+    SPErr status = kSPNoError;
+
+    SPMessageData *basicMessage = (SPMessageData *)message;
+
+    sSPBasic = basicMessage->basic;
+
+    if (sSPBasic->IsEqual(caller, kSPInterfaceCaller)) {
+        if (sSPBasic->IsEqual(selector, kSPInterfaceAboutSelector)) {
+            DoAbout(basicMessage->self, AboutID);
+        }
+
+        if (sSPBasic->IsEqual(selector, kSPInterfaceStartupSelector)) {
+            return kSPNoError;
+        }
+
+        if (sSPBasic->IsEqual(selector, kSPInterfaceShutdownSelector)) {
+            status = UninitializePlugin();
+        }
+    }
+
+    if (sSPBasic->IsEqual(caller, kPSPhotoshopCaller)) {
+        if (sSPBasic->IsEqual(selector, kPSDoIt)) {
+            PSActionsPlugInMessage *tmpMsg = (PSActionsPlugInMessage *)message;
+            BOOL status = EnumWindows(getPSMainWindowCB, (LPARAM)NULL);
+            assert(status != 0);
+            MessageBoxA(globalPSMainWindowHwnd, "Hello World!", "Tutorial Dialog", MB_OK|MB_ICONINFORMATION);
+        }
+    }
+
+    return status;
+}
+```
+
+So the code exploded a little bit, but none of this should be unfamilar to
+anyone who's written Win32 code before; we basically enumerate the open windows
+of the desktop to see which window matches the Photoshop one (since Photoshop
+disallows itself from running multiple instances, this hack works fine), and
+launch a message dialog with our text.
+
+Ok, so far the code is fairly straightforward. Now what combination of compiler
+flags and post-build steps do we need to make this a DLL that Photoshop can load?
+
+
+# Recipe: Reading layer data through C++ #
+
+# Recipe: Running a Filter from an Automation plug-in #
+
+# Recipe: Integrating ImGui with Photoshop #
+
+# Recipe: Communicating between CEP panels and C++ plug-ins #
 
 # Credits #
 
