@@ -1,10 +1,8 @@
 #include <SPBasic.h>
-// #include <SPTypes.h>
 #include <SPInterf.h>
 
 #include <PIActionsPlugin.h>
 #include <PIUtilities.h>
-
 
 #include <Windows.h>
 #include <string.h>

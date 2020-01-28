@@ -149,21 +149,21 @@ For example, **filter** plug-ins (the kind that show up in the
 **Filter** menu, which basically run math operations on your layer's
 image pixels) have the entry point signature of:
 
-```
+~~~~~~
 DLLExport MACPASCAL void PluginMain(const int16_t selector,
                                     FilterRecordPtr filterRecord,
                                     long long *data,
                                     int16_t *result);
-```
+~~~~~~
 
 and a file extension of `.8bf`, whereas **automation** plug-ins have
 a different entry point that Photoshop calls:
 
-```
+~~~~~~
 DLLExport SPAPI SPErr AutoPluginMain(const char* caller,
                                      const char* selector,
                                      void* message);
-```
+~~~~~~
 
 and a file extension of `.8li` instead.
 
@@ -184,7 +184,7 @@ go ahead and create `tutorial_automation_main.cpp`, and fill it with
 the following code:
 
 
-```cpp
+~~~~~~cpp
 SPBasicSuite *sSPBasic = NULL;
 
 
@@ -227,14 +227,14 @@ DLLExport SPAPI SPErr AutoPluginMain(const char* caller,
 
     return status;
 }
-```
+~~~~~~
 While things here should be fairly self-explanatory, I'll go over a couple of
 slightly important bits that are useful to keep in mind as you continue
 development:
 
-```cpp
+~~~~~~cpp
 SPBasicSuite *sSPBasic = NULL;
-```
+~~~~~~
 
 
 This seems rather innocuous, but is actually required; it's used for the
@@ -249,7 +249,7 @@ In this case, we release the suite when we unload the plugin, in the
 
 The next few lines of code are also fairly straightforward:
 
-```cpp
+~~~~~~cpp
     SPMessageData *basicMessage = (SPMessageData *)message;
 
     sSPBasic = basicMessage->basic;
@@ -273,7 +273,7 @@ The next few lines of code are also fairly straightforward:
             PSActionsPlugInMessage *tmpMsg = (PSActionsPlugInMessage *)message;
         }
     }
-```
+~~~~~~
 
 When Photoshop calls our `AutoPluginMain` entry point, you can see that it
 passes in a `message` parameter. This message is basically used to tell the
@@ -290,9 +290,24 @@ console application on Windows, and thus we won't actually see anything if we
 just `printf` our way around. So for now, let's just write some simple code to
 launch a message dialog with the necessary text:
 
-```cpp
+~~~~~~cpp
+#include <SPBasic.h>
+#include <SPInterf.h>
+
+#include <PIActionsPlugin.h>
+#include <PIUtilities.h>
+
 #include <Windows.h>
 #include <string.h>
+#include <assert.h>
+
+#include <DialogUtilitiesWin.cpp>
+#include <PIDLLInstance.cpp>
+#include <PIUSuites.cpp>
+#include <PIUtilities.cpp>
+#include <PIUtilitiesWin.cpp>
+#include <PIWinUI.cpp>
+
 
 #define WIN32_MAX_CLASS_NAME_LENGTH 256
 
@@ -355,7 +370,7 @@ DLLExport SPAPI SPErr AutoPluginMain(const char* caller,
 
     return status;
 }
-```
+~~~~~~
 
 So the code exploded a little bit, but none of this should be unfamilar to
 anyone who's written Win32 code before; we basically enumerate the open windows
@@ -366,7 +381,7 @@ launch a message dialog with our text.
 Ok, so far the code is fairly straightforward. Now what combination of compiler
 flags and post-build steps do we need to make this a DLL that Photoshop can load?
 
-## Building your first Automation plug-in ##
+## Overview of the build process ##
 
 Before we start writing the build script, there's a few wrenches in the works
 that Adobe has thrown in when it comes to building our plug-in. Here's the
@@ -461,7 +476,7 @@ So what exactly does a PiPL file look like, then? Luckily, the samples included
 in the documentation provide most of the starting points we need. First, let's
 define some globals in a file called `tutorial_automation_globals.h`:
 
-```cpp
+~~~~~~cpp
 #define TUTORIAL_AUTOMATION_PLUGINNAME "AutomationTutorial"
 #define TUTORIAL_AUTOMATION_PLUGINDESC "An example automation plug-in for Adobe Photoshop."
 #define TUTORIAL_AUTOMATION_UUID "267c8093-d35c-4fb7-b0ae-7b224c7fc1ce"
@@ -470,14 +485,14 @@ define some globals in a file called `tutorial_automation_globals.h`:
 #define TUTORIAL_AUTOMATION_CLASS_ID TUTORIAL_AUTOMATION_SUITE_ID
 #define TUTORIAL_AUTOMATION_EVENT_ID 'ExAm'
 #define TUTORIAL_AUTOMATION_VENDORNAME "memyselfandi"
-```
+~~~~~~
 
 You can generate the UUID using any tool of your choice. On Windows, you can
 use ``uuidgen.exe``.
 
 The PiPL resource file then follows, like so:
 
-```cpp
+~~~~~~cpp
 #include "PIDefines.h"
 #include "tutorial_automation_globals.h"
 
@@ -565,14 +580,15 @@ resource 'aete' (TUTORIAL_AUTOMATION_RESOURCE_ID, TUTORIAL_AUTOMATION_PLUGINNAME
             }   /* end of any enumerations */
         }
     };
-```
+~~~~~~
 The eagle-eyed (or incredibly bored) viewer might have noticed the addition of
 the lines:
 
-```
+~~~~~~cpp
         EnableInfo { "true" },
 
         ...
+
         Persistent{},
 
         // Only relevant if Persistent is set.
@@ -583,7 +599,7 @@ the lines:
             shutdownRequired,
             acceptProperty
         },
-```
+~~~~~~
 
 The former basically disables the plugin in the menu unless an actual Photoshop
 document is currently open (which is nice sometimes, as you don't want to trick
@@ -597,8 +613,7 @@ loads into Photoshop.) You can omit this if you'd like.
 There's another optional step after building the plug-in that also involves
 something called a `.p12` certificate, which is used by `ZXPSignCmd.exe`. What
 exactly is that? If we take a look at
-the
-[documentation](https://wwwimages2.adobe.com/content/dam/acom/en/devnet/creativesuite/pdfs/SigningTechNote_CC.pdf),
+the [documentation](https://wwwimages2.adobe.com/content/dam/acom/en/devnet/creativesuite/pdfs/SigningTechNote_CC.pdf),
 we see that it's basically Adobe's way of allowing developers to certify that
 their code has not been altered before being deployed to end-users (presumably
 because most extensions are written in JSX/JavaScript and people are scared
@@ -615,11 +630,11 @@ this step entirely.
 To generate the certificate, we'll make a self-signed one for now. You can, of
 course, pay money to a Certificate Authority (CA) and get one there, but for
 personal usage, a self-signed one will suffice. Thankfully, we can do this as
-well using the `ZXPSignCmd.exe` tool. From the [documentation](https://github.com/Adobe-CEP/Getting-Started-guides/tree/master/Package%20Distribute%20Install#acquiring-a-signed-certificate)
+well using the `ZXPSignCmd.exe` tool. From the [documentation](https://github.com/Adobe-CEP/Getting-Started-guides/tree/master/Package%20Distribute%20Install#acquiring-a-signed-certificate):
 
-```
+~~~~~~batch
 ZXPSignCmd -selfSignedCert <countryCode> <stateOrProvince> <organization> <commonName> <password> <outputPath.p12> [options]
-```
+~~~~~~
 
 You will then get a `.p12` file which you can for creating your packaged native
 extension later on.
@@ -630,7 +645,7 @@ extension later on.
 Create a new file called `build.bat`, and let's get started writing up the
 previous diagram into code:
 
-```batch
+~~~~~~batch
 @echo off
 setlocal
 
@@ -646,13 +661,13 @@ call "%vs2017installdir%\VC\Auxiliary\Build\vcvarsall.bat" x64
 set BuildDir=%~dp0msbuild
 if not exist %BuildDir% mkdir %BuildDir%
 pushd %BuildDir%
-```
+~~~~~~
 
 Yes, I'm putting the signing password into the build script since the
 certificate is self-signed and of no practical use in terms of being a security
 device. For now, let's just move on and set up the compiler flags we're going to use.
 
-```batch
+~~~~~~batch
 set ProjectName=tutorial_automation
 
 set EntryPoint=%~dp0src\%ProjectName%_main.cpp
@@ -676,13 +691,13 @@ set CommonCompilerFlags=/nologo /W3 /WX %CommonIncludePaths% /Zc:__cplusplus /ar
 set CompilerFlagsDebug=%CommonCompilerFlags% /Od /Zi /D_DEBUG /MDd
 set CompilerFlagsRelease=%CommonCompilerFlags% /Ox /DNDEBUG /MD
 set CompilerFlagsRelWithDebInfo=%CommonCompilerFlags% /Ox /Zi /DNDEBUG /MD
-```
+~~~~~~
 
 You can see that we have a bunch of extra preprocessor defines in there, some of
 which might make no sense (or be even spurious). Leave it all be for now, and
 let's set up the compilation commands themselves.
 
-```batch
+~~~~~~batch
 echo.
 echo Compiling resources (command follows below)...
 set ResourceRR=%BuildDir%\%ProjectName%_pipl.rr
@@ -708,7 +723,7 @@ echo.
 echo Output from compilation:
 %BuildCommand%
 if %errorlevel% neq 0 goto error
-```
+~~~~~~
 
 For Photoshop, there's one thing that helps us when it comes to deploying our
 extensions: the normal path where you're supposed to deploy extensions to is
@@ -719,7 +734,7 @@ following shortcuts as well. Thus, what I usually do is make a shortcut link in
 the folder itself to a deploy location (which is why we define
 `PhotoshopPluginsDeployPath` above), and just copy the plug-ins there, like so:
 
-```batch
+~~~~~~batch
 echo.
 echo Deploying built binaries and symbols...
 copy /Y "%OutBin%"  "%PhotoshopPluginsDeployPath%"
@@ -727,7 +742,7 @@ if %errorlevel% neq 0 goto error
 
 copy /Y "%BuildDir%\%ProjectName%.pdb" "%PhotoshopPluginsDeployPath%"
 if %errorlevel% neq 0 goto error
-```
+~~~~~~
 
 We copy the `.pdb` file as well, since it'll help the MSVC debugger when we want
 to end up debugging the plug-in later on if there's a problem.
@@ -735,7 +750,7 @@ to end up debugging the plug-in later on if there's a problem.
 Finally, we build and sign the `.zxp` extension package for deployment to
 end-users, and we're done with the build script!
 
-```batch
+~~~~~~batch
 set OutZXP=%BuildDir%\%ProjectName%.zxp
 set BuildZXPCommand=%ZXPSignCmdExe% -sign "%~dp0msbuild" "%OutZXP%" "%ZXPCert%" %ZXPCertPassword%
 
@@ -774,11 +789,13 @@ popd
 endlocal
 
 exit /b %errorlevel%
-```
+~~~~~~
 
 !!! tip
     The full version of this build script is available in the accompanying code
     repository for this tutorial.
+
+Run ``build.bat`` and wait for the process to spit out the `.8li` DLL.
 
 After you've made sure that you've deployed the plugin in a suitable location
 that Photoshop can find, go ahead and open Photoshop, then launch your plug-in
@@ -803,7 +820,28 @@ from the Automation menu. You should see the following message box appear:
 
 Congratulations, you've just made your first native plug-in in Photoshop!
 
+## Debugging your plug-in ##
+
+Let's make sure we're able to debug our plug-in first before we get carried
+away. If you've been following along so far, run `build.bat debug` in order to
+generate a version of the `.8li` with optimizations disabled and an accompanying
+`.pdb` file generated alongside it as well.
+
+After that, launch Photoshop and Visual Studio. You should be able to attach to
+the Photoshop process, set a breakpoint, then run your Automation action; the
+breakpoint in Visual Studio should get triggered and allow you to step through
+your plug-in.
+
+!!! warning Threading in Photoshop plug-ins
+    Basically, **no**. The Photoshop API is **not thread-safe**, so threading in
+    plug-ins is generally not advisable.
+
+Now that we have a basic build-deploy-debug workflow going, we can finally start
+to do something mildly useful with it.
+
 # Recipe: Reading layer data through C++ #
+
+
 
 # Recipe: Running a Filter from an Automation plug-in #
 
