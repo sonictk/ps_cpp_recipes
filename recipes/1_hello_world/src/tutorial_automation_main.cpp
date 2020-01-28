@@ -1,5 +1,22 @@
+#include <SPBasic.h>
+// #include <SPTypes.h>
+#include <SPInterf.h>
+
+#include <PIActionsPlugin.h>
+#include <PIUtilities.h>
+
+
 #include <Windows.h>
 #include <string.h>
+#include <assert.h>
+
+#include <DialogUtilitiesWin.cpp>
+#include <PIDLLInstance.cpp>
+#include <PIUSuites.cpp>
+#include <PIUtilities.cpp>
+#include <PIUtilitiesWin.cpp>
+#include <PIWinUI.cpp>
+
 
 #define WIN32_MAX_CLASS_NAME_LENGTH 256
 
@@ -23,7 +40,7 @@ BOOL CALLBACK getPSMainWindowCB(HWND hwnd, LPARAM lParam)
 SPErr UninitializePlugin()
 {
 	PIUSuitesRelease();
-	return status;
+	return kSPNoError;
 }
 
 
