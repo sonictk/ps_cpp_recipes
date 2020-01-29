@@ -33,7 +33,12 @@ will be far less bloated.
 
 # Code Repository #
 
-All the source code for this tutorial is available [here](https://github.com/sonictk/ps_cpp_recipes).
+All the source code for this tutorial is
+available [here](https://github.com/sonictk/ps_cpp_recipes). Feel free to
+inspect the source code while following along with this tutorial, since the
+sources have more comments to help document what certain code is meant to
+accomplish; the sources here are slightly more slimmed-down in order to enhance
+readability.
 
 
 # Motivation #
@@ -1619,7 +1624,7 @@ We see that we have access to a linked list of layers in the document through
 the `layersDescriptor` pointer in this struct, which will be what we use to
 iterate through all the layers in the current Photoshop document.
 
-## Writing a filter plug-in in Photoshop ##
+## Writing a filter plug-in ##
 
 Similar to how we wrote the automation filter, let's begin with the entry point
 and the necessary machinery around it. Create a new source file called
@@ -1637,6 +1642,7 @@ SPBasicSuite *sSPBasic = NULL;
 
 void executeFilter(const FilterRecordPtr &filterRecord)
 {
+    // TODO: implement
 	return;
 }
 
@@ -1668,6 +1674,23 @@ DLLExport MACPASCAL void PluginMain(const int16_t selector,
 	return;
 }
 ~~~~~~
+
+The code here isn't terribly interesting; basically, at our entry point, we case
+for whether the filter has been executed from the Photoshop menu, and if so, we
+check if the current document is considered a "big" document (i.e. a `.psb`
+document), set the `filterRecord` attribute as appropriate, and call our
+`executeFilter` function, which is currently stubbed out for now.
+
+!!! tip Large Photoshop documents VS standard ones
+    Recall that Photoshop has a very long history, and started out as a 32-bit
+    application. As demands grew, Photoshop documents started to balloon in
+    sizes, to the point where they were starting to brush up against both
+    filesystem limitations and the Photoshop engine as well. As such, Adobe
+    introduced the `.psb` large photoshop document format to complement the
+    existing `.psd` one. The format is essentially shared between the two, but
+    has some subtle differences. The
+    [Photoshop Document File Specification](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/)
+    is a good reference for understanding what some of these differences are.
 
 We'll make some global definitions again for this new plug-in, of course, in a
 file called `tutorial_globals.h`:
@@ -1945,8 +1968,14 @@ endlocal
 exit /b %errorlevel%
 ~~~~~~
 
+You should be able to now build this and get a `.8bf` file (which is the
+extension for Photoshop filter plug-ins).
 
-# Recipe: Integrating ImGui with Photoshop #
+## Getting to the layers ##
+
+If you were paying attention to what you were copying, you'd have noticed that
+
+# Recipe: Using ImGui for Photoshop tools #
 
 # Recipe: Communicating between CEP panels and C++ plug-ins #
 
