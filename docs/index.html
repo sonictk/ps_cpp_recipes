@@ -443,6 +443,7 @@ illustrated in the diagram below:
 *               +------------------------------------+             *
 *                                                                  *
 ********************************************************************
+[Figure [diagram]: An overview of what it takes to create a Photoshop plug-in.]
 
 It's rather involved, as you can see, which is unfortunate. You'll also notice
 that I reference some executables which are probably unfamiliar, notably
@@ -839,11 +840,319 @@ your plug-in.
 Now that we have a basic build-deploy-debug workflow going, we can finally start
 to do something mildly useful with it.
 
+# Why bother with different Photoshop plug-in types? #
+
+So now that we have an Automation plug-in, I'd like to pause for a second and go
+over the various signatures of few various types of plug-in entry point types in
+Photoshop. We're now familiar with the **Automation** type of entry point:
+
+~~~~~~cpp
+DLLExport SPAPI SPErr AutoPluginMain(const char* caller,
+                                     const char* selector,
+                                     void* message)
+~~~~~~
+
+We see that it actually doesn't offer us that much to play with alone, since all
+we really get is just some very basic metadata about the caller of our plugin,
+and what ``selector`` case triggered the call (which is basically
+Photoshop-speak for what caused the caller to call our entry point in the first
+place). We don't get access to anything else here unless the rest of the
+Photoshop API exposes it to us. And once you start looking more at the
+documentation included in the SDK, you'll come to realize that the amount of
+functionality exposed to third-party developers (which is who we are) is, quite
+frankly, rather pitiful.
+
+In order to even access the data in the active Photoshop document, we'll need to
+consider other plug-in types instead. If you read the **Types of plug-in
+modules** page located in the Photoshop SDK documentation, you'll be able to see
+that each plug-in's entry point delivers more information to you so that you can
+make the appropriate data transformations. For example, if we wanted to write an
+exporter plug-in for Photoshop that exported our layers in the document to some
+custom data format for use in an engine or whatnot, we'd go ahead and make a
+**Export** type of plug-in:
+
+~~~~~~cpp
+DLLExport MACPASCAL void PluginMain (const int16 selector,
+                                     ExportRecordPtr exportParamBlock,
+                                     intptr_t *data,
+                                     int16 *result)
+~~~~~~
+
+If we take a look at what `ExportRecordPtr` gives us (in `PIExport.h`), we can
+see that it's a _ton_ of document data that could be of potential use to us:
+
+~~~~~~cpp
+typedef struct ExportRecord
+    {
+
+    int32           serialNumber;   /**< @deprecated  - Formerly the host serial number.
+									   The host now reports
+									   zero for the \c serialNumber. Plug-ins should use
+                                       the @ref PropertySuite through the @ref ExportRecord::propertyProcs callback
+                                       and specify the property 'propSerialString2' to get the
+                                       serial string. */
+
+    TestAbortProc   abortProc;      /**< A pointer to the \c TestAbortProc callback. */
+
+    ProgressProc    progressProc;   /**< A pointer the the \c ProgressProc callback. */
+
+    int32           maxData;        /**< The maximum number of bytes Photoshop can free up for a plug-in
+                                         to use. You can reduce this
+                                         value during in your \c exportSelectorPrepare handler.
+                                         The \c exportSelectorContinue handler should process
+                                         the image in pieces no larger than \c maxData, less
+                                         the size of any large tables or scratch areas it
+                                         has allocated. */
+
+    int16           imageMode;      /**< The mode of the image being exported (grayscale,
+                                         RGB Color, etc.). See @ref ImageModes "Image Modes" for values. Your
+                                         \c exportSelectorStart handler should return an
+                                         \c exportBadMode error if it is unable to process this
+                                         mode of image. */
+    Point           imageSize;      /**< @deprecated Use \c ExportRecord::imageSize32. The width and height
+                                         of the image in pixels. See @ref ExportRecord::imageSize32 for large document
+                                         support. */
+    int16           depth;          /**< The resolution of the image in bits per pixel per plane.
+                                         The only possible settings are 1, 8, 16, and 32. */
+    int16           planes;         /**< The number of channels in the image. For example, if an
+                                         RGB image without alpha channels is being processed,
+                                         this field is set to 3. */
+
+    Fixed           imageHRes;      /**< The horizontal resolution of the image in terms of pixels
+                                         per inch. These are fixed point 16-binary digit numbers. */
+    Fixed           imageVRes;      /**< The vertical resolution of the image in terms of pixels
+                                         per inch. These are fixed point 16-binary digit numbers. */
+
+    LookUpTable         redLUT;         /**< The red color table, user only when an indexed color or
+                                         duotone mode image is being processed. */
+    LookUpTable         greenLUT;       /**< The green color table, user only when an indexed color or
+                                         duotone mode image is being processed. */
+    LookUpTable         blueLUT;        /**< The blue color table, user only when an indexed color or
+                                         duotone mode image is being processed. */
+
+    Rect            theRect;        /**< @deprecated Use \c ExportRecord::theRect32. The \c exportSelectorStart and
+                                         \c exportSelectorContinue handlers
+                                         should set this field to request a piece of the image for
+                                         processing. It should be set to an empty rectangle when
+                                         complete.  See @ref ExportRecord::theRect32 for large document support. */
+
+    int16           loPlane;        /**< The \c exportSelectorStart and \c exportSelectorContinue
+                                         handlers should set these fields to the first plane to process
+                                         next. */
+    int16           hiPlane;        /**< The \c exportSelectorStart and \c exportSelectorContinue
+                                         handlers should set these fields to the last plane to process
+                                         next. */
+
+    void *          data;           /**< A pointer to the requested image data. If more than one plane
+                                         has been requested (see \c loPlane and \c hiPlane), the data is
+                                         interleaved. */
+    int32           rowBytes;       /**< The offset between rows for the requested image data. */
+
+    Str255              filename;       /**< The name of the file the image was read from. File-exporting
+                                         modules should use this field as the default name for saving. */
+
+    int16           vRefNum;        /**< @deprecated Do not use */
+
+    Boolean         dirty;          /**< If the plug-in is used to save an image into a file, it should
+                                         set this field to TRUE to prompt the user to save any unsaved
+                                         changes when the image is eventually closed. If the plug-in module
+                                         outputs to a printer or other hardware device, it should
+                                         set this to FALSE. This is initialized as TRUE. It does not
+                                         reflect whether other unsaved changes have been made. */
+
+    Rect            selectBBox;     /**< \deprecated Use \c ExportRecord::selectBBox32. The bounding box of the current selection. If there is no
+                                         current selection, this is an empty rectangle.
+                                         See @ref ExportRecord::selectBBox32 below for large document support.  */
+
+    OSType          hostSig;        /**< The signature of the host, provided by the plug-in host.
+                                         The Photoshop signature is 8BIM.   */
+    HostProc        hostProc;       /**< If not NULL, a pointer to a host-defined callback procedure. */
+
+    Handle          duotoneInfo;    /**< When exporting a duotone mode image, the host allocates a
+                                         handle and fills it with the duotone information. The format
+                                         of the information is the same as that required by Import
+                                         modules, and should be treated as a black box by plug-ins. */
+
+    int16           thePlane;       /**< The currently selected channel; <br> or -1 if a composite
+                                         color channel; <br> or -2 if some other combination of channels. */
+
+    PlugInMonitor   monitor;        /**< The monitor setup information for the host.  */
+
+    void *          platformData;   /**< A pointer to platform specific data. Not used under the
+                                         Mac OS. See PlatformData in PITypes.h. */
+
+    BufferProcs *   bufferProcs;    /**< Buffer callback suite.  */
+
+    ResourceProcs *     resourceProcs;  /**< Pseudo-Resource callback suite. */
+
+    ProcessEventProc processEvent;  /**< ProcessEvent callback. */
+
+    DisplayPixelsProc displayPixels;/**< DisplayPixels callback. */
+
+    HandleProcs         *handleProcs;   /**< Handle callback suite. */
+
+    // New in 3.0
+
+    ColorServicesProc colorServices; /**< ColorServices callback suite.  */
+
+    GetPropertyProc     getPropertyObsolete; /**< @deprecated  Property suite. This direct callback
+                                              has been replaced by @ref ExportRecord::propertyProcs, but is
+                                              maintained here for backwards compatibility. */
+
+    AdvanceStateProc advanceState;      /**<  Allows the plug-in to drive the interaction through the inner
+                                              \c ExportSelectorContinue loop
+                                              without actually returning from the plug-in.
+                                              The \c advanceState callback can be called from either
+                                              \c exportSelectorStart or \c exportSelectorContinue. \n\n
+                                              If it returns an error, then the plug-in generally should treat this as a
+                                              continue error and pass it on when it returns. */
+    int16           layerPlanes;          /**< For documents with transparency, contains the number of planes of
+                                               data possibly governed by a transparency mask for the current
+                                               target layer. */
+    int16           transparencyMask;     /**< For documents with transparency, contains 1 or 0 indicating whether
+                                               the data is governed by a transparency mask.  */
+    int16           layerMasks;               /**< For documents with transparency, contains the number of layer masks
+                                               (currently 1 or 0) for which 255 = fully opaque. In
+                                               Photoshop 3.0.4+, layer masks are not visible to Export
+                                               modules (i.e. the value is 0) since they are layer properties
+                                               rather than document properties. */
+    int16           invertedLayerMasks;       /**< For documents with transparency, contains the number of layer masks
+                                               (currently 1 or 0) for which 255 = fully transparent.
+                                               In Photoshop 3.0.4+, layer masks are not visible to
+                                               Export modules (i.e. the value is 0) since they are layer
+                                               properties rather than document properties. */
+    int16           nonLayerPlanes;           /**< For documents with transparency, contains the number of planes
+                                               of non-layer data, e.g., flat data or alpha channels. The planes are
+                                               arranged in that order. Thus, an RGB image with an alpha
+                                               channel and a layer mask on the current target layer
+                                               would appear as: red, green, blue, transparency, layer
+                                               mask, alpha channel. */
+
+    /* Note that the layer mask fields are necessarily zero in 3.0.4 since
+       the export module receives the merged data and the merged data doesn't
+       really have a layer mask associated with it. */
+
+    // New in 3.0.4
+
+    ImageServicesProcs *imageServicesProcs;
+                                        /**< Image Services callback suite. */
+
+    int16               tileWidth;      /**< The width of the tiles. The host sets
+                                             the width and height of the tiles. This is the best size
+                                             for the plug-in to work with, if possible.  If zero, assume the host
+                                             has not set the value. */
+
+    int16               tileHeight;         /**< The height of the tiles. The host sets
+                                             the width and height of the tiles. This is the best size
+                                             for the plug-in to work with, if possible. If zero, assume the host
+                                             has not set the value. */
+
+    Point               tileOrigin;         /**< The origin point of the tiling system. */
+
+    PropertyProcs   *propertyProcs;         /**< Property callback suite.  The plug-in needs to
+                                             dispose of the handle returned for     complex properties (the
+                                             plug-in also maintains ownership of handles for
+                                            set properties.     */
+
+    // New in 4.0
+
+    PIDescriptorParameters  *descriptorParameters;  /**< Descriptor suite. */
+    Str255                  *errorString;           /**< An error reporting string the plug-in can return to the host.
+                                                         If the plug-in returns with result=errReportString then
+                                                         the string stored here is be displayed as:
+                                                         "Cannot complete operation because " + \c errorString */
+
+    ChannelPortProcs *channelPortProcs;         /**< Channel Ports callback suite. */
+
+    ReadImageDocumentDesc *documentInfo;    /**< The Channel Ports document information
+                                                 for the document being filtered. */
+
+    // New in 5.0
+
+    SPBasicSuite    *sSPBasic;          /**< PICA basic suite.  The method by which all PICA suites are accessed. */
+    void            *plugInRef;         /**< Plug-in reference used by PICA. */
+
+    int32           transparentIndex;   /**< If IndexedColor, and < 256, this is the index of the
+                                             transparent color (for GIF).] */
+
+    Handle          iCCprofileData;         /**< Handle containing the ICC profile for the image. (NULL if none.)
+                                            Photoshop allocates the handle using the Photoshop handle suite.
+                                            The handle is unlocked while calling the plug-in.
+                                            The handle is valid from  \c ExportSelectorStart to \c ExportSelectorFinish
+                                            Photoshop frees the handle after \c ExportSelectorFinish. */
+
+    int32           iCCprofileSize;         /**< Size of profile. */
+
+    int32           canUseICCProfiles;  /**< Non-zero if the host can accept or export ICC profiles .
+                                            If this is zero, the plug-in should not set or dereference
+                                            \c iCCprofileData.
+                                        */
+
+    // New in 5.5
+
+    int32           lutCount;           /**< Number of entries in the indexed color table.
+                                             This should include the transparent index if any. Plug-ins should
+                                             pad out the color table with black for backward compatibility. */
+
+    // New in 8.0
+
+    int32       HostSupports32BitCoordinates;   /**< Set by the host if the host supports 32 bit plug-in API. */
+
+    int32       PluginUsing32BitCoordinates;    /**< Set to nonzero by the plug-in if it is
+                                                     using the 32 bit fields. */
+
+    VPoint      imageSize32;                    /**< Size of image in 32 bit coordinates.
+                                                     Replaces \c ExportRecord::imageSize */
+
+    VRect       theRect32;                      /**< Rectangle being returned in 32 bit coordinates.
+                                                     Replaces \c ExportRecord::theRect */
+
+    VRect       selectBBox32;                   /**< The bounding box of the current selection
+                                                     returned in 32 bit coordinates. If there is no
+                                                     current selection, this is an empty rectangle.
+                                                     Replaces \c ExportRecord::selectBBox. */
+
+    /* Reserved Space for Expansion -- decrement when you add stuff */
+
+    ///@name Reserved Space for Expansion
+    //@{
+    char            reserved [106]; /**< Reserved for future use. Set to zero */
+    //@}
+
+    }
+ExportRecord, *ExportRecordPtr;
+~~~~~~
+
+I'll leave you to read the comments if you want to find out about everything you
+now have access to, but the most important member here (assuming you really were
+writing an exporter) is the `data` member, which contains the raw bytes that
+you're trying to transform. Of course, you could also take a look at the
+`documentInfo` pointer, which being a pointer to a `ReadImageDocumentDesc`
+structure gives you access to basically the entire Photoshop document's layers,
+channels, metadata, etc.
+
+My advice is to work out what exactly you're attempting to do with your plug-in,
+and then take a look at the documentation regarding various Photoshop plug-in
+types to see which might be most appropriate, while also referring to the SDK
+samples to see what each plug-in type has access to in terms of data that
+Photoshop exposes to it.
+
 # Recipe: Reading layer data through C++ #
 
+This recipe will focus on a very simple operation: reading layer data from a
+Photoshop document, and then exporting it to disk. However, I'll also
+demonstrate (in a simpler fashion) one of the examples of combining a Photoshop
+Automation plug-in to execute a Filter plug-in, thus allowing an Automation
+plug-in to essentially trigger modifications on an existing open document's pixels.
 
+!!! tip Prerequisite knowledge
+    You should already be familar with making Automation plug-ins and building
+    Photoshop plug-ins in general. If not, read the first recipe of this
+    tutorial in Section [Recipe: Minimalist approach to Photoshop plug-ins].
 
-# Recipe: Running a Filter from an Automation plug-in #
+I'll skip the research here and get to the point: we'll be utilizing a
+**Filter** plugin to accomplish this, since it gives us access to what we need
+in order to read the document pixels.
 
 # Recipe: Integrating ImGui with Photoshop #
 
@@ -851,7 +1160,7 @@ to do something mildly useful with it.
 
 # Credits #
 
-* Tom Ruark, for assisting with some of my queries, cryptic though his replies were.
+* Tom Ruark, for assisting with some of my queries.
 
 
 <style class="fallback">body{visibility:hidden}</style><script>markdeepOptions={tocStyle:'medium'};</script>
