@@ -1,0 +1,25 @@
+#ifndef TUTORIAL_GLOBALS_H
+#define TUTORIAL_GLOBALS_H
+
+
+#define TUTORIAL_FILTER_PLUGINNAME "FilterTutorial"
+#define TUTORIAL_FILTER_PLUGINDESC "A filter plug in for Adobe Photoshop that retrieves pixel data info from the current document."
+#define TUTORIAL_FILTER_UUID "e02828c8-69af-4977-9294-b3221dbcec49"
+#define TUTORIAL_FILTER_RESOURCE_ID 18008
+#define TUTORIAL_FILTER_SUITE_ID 'Filt'
+#define TUTORIAL_FILTER_CLASS_ID TUTORIAL_FILTER_SUITE_ID
+#define TUTORIAL_FILTER_EVENT_ID 'filt'
+#define TUTORIAL_FILTER_VENDORNAME "memyselfandi"
+
+#define TUTORIAL_FILTER_TRIGGERNAME "trigger"
+#define TUTORIAL_FILTER_KEYTRIGGER 'Tgr '
+#define TUTORIAL_FILTER_TYPETRIGGER 'TTgr'
+#define TUTORIAL_FILTER_TRIGGERDESC "Activates the filter."
+
+#define TUTORIAL_FILTER_KEYRESULT 'Rslt'
+#define TUTORIAL_FILTER_TYPERESULT 'TRsl'
+
+#define TUTORIAL_FILTER_ENUMINFONAME "Info"
+#define TUTORIAL_FILTER_ENUMINFO 'Info'
+
+#endif
