@@ -40,6 +40,13 @@ sources have more comments to help document what certain code is meant to
 accomplish; the sources here are slightly more slimmed-down in order to enhance
 readability.
 
+A word of caution: this code is written in a very tutorial-focused,
+non-production manner. This means that there is very little
+error-checking/handling going on, with brevity and readability favoured over
+other options that might be more performant and/or scalable. The code is
+available as a reference, and should not be taken as an indicator of what good
+robust code shipped to end-users should look like.
+
 
 # Motivation #
 
@@ -57,17 +64,21 @@ explain in detail later on, here's a brief list of bullet points:
 
 * For reasons which will be explained later, CEP is _slow_. It's to the point
   where for certain operations (not even at scale), it's so slow in execution as
-  to be unusable.
+  to be unusable (e.g. try checking which layers are locked in a document with
+  >200 layers.)
 
 * Debugging the CEP JavaScript/Adobe JSX layers is incredibly time-consuming and
   sometimes also impossible, depending on the exposed API calls you're
   attempting to make. Also, if there's a bug in the CEP/JS layer itself, you
   likely will have no chance of solving it on your own without Adobe's help (and
-  good luck with that!).
+  good luck with that!). On the compiled side of things, as you'll see later on,
+  there's some seemingly insurmountable problems that _can_ be solved with a bit
+  of ingenuity.
 
 * It's JavaScript. Which probably sounded like a good idea to some product
   manager back in the day, but now just serves to be a major pain even when
-  programming in it.
+  programming in it under normal circumstances. I'll take having an optimizing
+  compiler over a JIT language any day, thank you very much.
 
 
 # Requirements #
@@ -614,7 +625,7 @@ basically allows us to keep the plug-in loaded into memory on startup (which is
 what I usually do, since I initialize a bunch of things the moment my plugin
 loads into Photoshop.) You can omit this if you'd like.
 
-## Package signing (optional) ##
+## Package signing ##
 
 There's another optional step after building the plug-in that also involves
 something called a `.p12` certificate, which is used by `ZXPSignCmd.exe`. What
@@ -1514,108 +1525,108 @@ pointer here, which will direct us to a struct like so:
 typedef struct ReadImageDocumentDesc
 {
 
-	int32 minVersion;	   /**< The minimum version needed to interpret this record. */
-	int32 maxVersion;	   /**< The maximum version allowable to interpret this record. */
+    int32 minVersion;      /**< The minimum version needed to interpret this record. */
+    int32 maxVersion;      /**< The maximum version allowable to interpret this record. */
 
-	//---------------------------------------------------------------------------
-	//	Version 0 fields:
-	//---------------------------------------------------------------------------
+    //---------------------------------------------------------------------------
+    //  Version 0 fields:
+    //---------------------------------------------------------------------------
 
-	int32 imageMode;		/**< Color mode for the document. See @ref ImageModes for supported modes. */
-	int32 depth;			/**< Default bit depth for the document. */
-	VRect bounds;			/**< Document bounds. */
+    int32 imageMode;        /**< Color mode for the document. See @ref ImageModes for supported modes. */
+    int32 depth;            /**< Default bit depth for the document. */
+    VRect bounds;           /**< Document bounds. */
 
-	Fixed hResolution;		/**< Horizontal resolution for the document. */
-	Fixed vResolution;		/**< Vertical resolution for the document. */
+    Fixed hResolution;      /**< Horizontal resolution for the document. */
+    Fixed vResolution;      /**< Vertical resolution for the document. */
 
-	LookUpTable redLUT;		/**< Red color table, applicable when \c imageMode is indexed color or duotone. */
-	LookUpTable greenLUT;	/**< Green color table, applicable when \c imageMode is indexed color or duotone. */
-	LookUpTable blueLUT;	/**< Blue color table, applicable when \c imageMode is indexed color or duotone. */
-
-
-	ReadChannelDesc *targetCompositeChannels;	/**< Composite channels in the target layer. */
-
-	ReadChannelDesc *targetTransparency;	   /**< Transparency channel for the target layer. */
-
-   	ReadChannelDesc *targetLayerMask;		   /**< Layer mask for the target channel. */
-
-	ReadChannelDesc *mergedCompositeChannels;  /**< Composite channels in the merged data. Merged
-												   data is either merged layer data or merged
-												   document data. */
-
-	ReadChannelDesc *mergedTransparency;	   /**< Transparency channel for the merged data. */
-
-	ReadChannelDesc *alphaChannels;			   /**< Alpha channels for masks */
-
-	ReadChannelDesc *selection;				   /**< Selection mask, if any. */
-
-	// New with version 1.
-	//---------------------------------------------------------------------------
-	//	Version 1 fields
-	//---------------------------------------------------------------------------
-	// New in version 1
-
-	struct SPPlatformFileSpecification_t *fileSpec;	 /**<  The file specification, if any. */
-
-	// New in version 2
-
-	ReadLayerDesc *layersDescriptor;		   /**< Descriptor for a linked list of layers, if any. */
-
-	int32 documentType;						   /**< Document type.  See @ref DocumentTypes "Document Types." */
-
-	struct ReadImageDocumentDesc *next;		   /**< The next descriptor in the list. */
-
-	//---------------------------------------------------------------------------
-	//	Version 3 fields (added in Photoshop CS3/10)
-	//---------------------------------------------------------------------------
-
-	// New in version 3
-
-	void *	iCCprofileData;		/**< ICC Profile Data. NULL if there is no profile  */
-
-	int32	iCCprofileSize;		/**< Size of the ICC profile; zero if there is no profile. */
-
-	int32	compositeChannelCount;	/**< Number of composite color channels in this document. */
-
-	int32	layerCount;			/**< Total number of layers in this document;
-	                                 ignores visbility, adjustments, etc.	*/
-
-	int32	alphaChannelCount;	/**< Number of alpha channels in this document. */
+    LookUpTable redLUT;         /**< Red color table, applicable when \c imageMode is indexed color or duotone. */
+    LookUpTable greenLUT;   /**< Green color table, applicable when \c imageMode is indexed color or duotone. */
+    LookUpTable blueLUT;    /**< Blue color table, applicable when \c imageMode is indexed color or duotone. */
 
 
-	//---------------------------------------------------------------------------
-	//	Version 4 fields (added in Photoshop CS3/10)
-	//---------------------------------------------------------------------------
+    ReadChannelDesc *targetCompositeChannels;   /**< Composite channels in the target layer. */
 
-	// Layer mask for the target layer:
-	ReadChannelDesc *targetSmartFilterMask;
+    ReadChannelDesc *targetTransparency;       /**< Transparency channel for the target layer. */
 
-	//---------------------------------------------------------------------------
-	//	Version 5 fields (added in Photoshop CS6/13)
-	//---------------------------------------------------------------------------
+        ReadChannelDesc *targetLayerMask;          /**< Layer mask for the target channel. */
 
-	// The Unicode file specification, if any.
-	struct SPPlatformFileSpecificationW *fileSpecW;
+    ReadChannelDesc *mergedCompositeChannels;  /**< Composite channels in the merged data. Merged
+                                                   data is either merged layer data or merged
+                                                   document data. */
 
-	//---------------------------------------------------------------------------
-	//	Version 6 fields (added in Photoshop CC 2015.5 (17.0))
-	//---------------------------------------------------------------------------
-	// The file specification, if any.
-	struct XPlatFileSpec *fileSpecX;
+    ReadChannelDesc *mergedTransparency;       /**< Transparency channel for the merged data. */
+
+    ReadChannelDesc *alphaChannels;                /**< Alpha channels for masks */
+
+    ReadChannelDesc *selection;                    /**< Selection mask, if any. */
+
+    // New with version 1.
+    //---------------------------------------------------------------------------
+    //  Version 1 fields
+    //---------------------------------------------------------------------------
+    // New in version 1
+
+    struct SPPlatformFileSpecification_t *fileSpec;      /**<  The file specification, if any. */
+
+    // New in version 2
+
+    ReadLayerDesc *layersDescriptor;           /**< Descriptor for a linked list of layers, if any. */
+
+    int32 documentType;                            /**< Document type.  See @ref DocumentTypes "Document Types." */
+
+    struct ReadImageDocumentDesc *next;            /**< The next descriptor in the list. */
+
+    //---------------------------------------------------------------------------
+    //  Version 3 fields (added in Photoshop CS3/10)
+    //---------------------------------------------------------------------------
+
+    // New in version 3
+
+    void *  iCCprofileData;         /**< ICC Profile Data. NULL if there is no profile  */
+
+    int32   iCCprofileSize;         /**< Size of the ICC profile; zero if there is no profile. */
+
+    int32   compositeChannelCount;  /**< Number of composite color channels in this document. */
+
+    int32   layerCount;             /**< Total number of layers in this document;
+                                     ignores visbility, adjustments, etc.   */
+
+    int32   alphaChannelCount;  /**< Number of alpha channels in this document. */
+
+
+    //---------------------------------------------------------------------------
+    //  Version 4 fields (added in Photoshop CS3/10)
+    //---------------------------------------------------------------------------
+
+    // Layer mask for the target layer:
+    ReadChannelDesc *targetSmartFilterMask;
+
+    //---------------------------------------------------------------------------
+    //  Version 5 fields (added in Photoshop CS6/13)
+    //---------------------------------------------------------------------------
+
+    // The Unicode file specification, if any.
+    struct SPPlatformFileSpecificationW *fileSpecW;
+
+    //---------------------------------------------------------------------------
+    //  Version 6 fields (added in Photoshop CC 2015.5 (17.0))
+    //---------------------------------------------------------------------------
+    // The file specification, if any.
+    struct XPlatFileSpec *fileSpecX;
 
 
   #ifdef __cplusplus
-	ReadImageDocumentDesc()
-		: minVersion(0), maxVersion(0), imageMode(0), depth(0),
-		  hResolution(0), vResolution(0),
-		  targetCompositeChannels(NULL), targetTransparency(NULL), targetLayerMask(NULL),
-		  mergedCompositeChannels(NULL), mergedTransparency(NULL), alphaChannels(NULL),
-		  selection(NULL), fileSpec(NULL), layersDescriptor(NULL), documentType(0),
-		  next(NULL), iCCprofileData(NULL), iCCprofileSize(0), compositeChannelCount(0),
-		  layerCount(0), alphaChannelCount(0), targetSmartFilterMask(NULL), fileSpecW(NULL),
-		  fileSpecX(0)
-		  	{
-		  	}
+    ReadImageDocumentDesc()
+        : minVersion(0), maxVersion(0), imageMode(0), depth(0),
+          hResolution(0), vResolution(0),
+          targetCompositeChannels(NULL), targetTransparency(NULL), targetLayerMask(NULL),
+          mergedCompositeChannels(NULL), mergedTransparency(NULL), alphaChannels(NULL),
+          selection(NULL), fileSpec(NULL), layersDescriptor(NULL), documentType(0),
+          next(NULL), iCCprofileData(NULL), iCCprofileSize(0), compositeChannelCount(0),
+          layerCount(0), alphaChannelCount(0), targetSmartFilterMask(NULL), fileSpecW(NULL),
+          fileSpecX(0)
+            {
+            }
   #endif // __cplusplus
 
 } ReadImageDocumentDesc;
@@ -1643,35 +1654,35 @@ SPBasicSuite *sSPBasic = NULL;
 void executeFilter(const FilterRecordPtr &filterRecord)
 {
     // TODO: implement
-	return;
+    return;
 }
 
 
 DLLExport MACPASCAL void PluginMain(const int16_t selector,
-									FilterRecordPtr filterRecord,
-									long long *data,
-									int16_t *result)
+                                    FilterRecordPtr filterRecord,
+                                    long long *data,
+                                    int16_t *result)
 {
-	switch (selector) {
-	case filterSelectorAbout:
-		sSPBasic = ((AboutRecord *)filterRecord)->sSPBasic;
+    switch (selector) {
+    case filterSelectorAbout:
+        sSPBasic = ((AboutRecord *)filterRecord)->sSPBasic;
 
-	case filterSelectorStart:
-	{
-		sSPBasic = filterRecord->sSPBasic;
-		if (filterRecord->bigDocumentData != NULL) {
-			filterRecord->bigDocumentData->PluginUsing32BitCoordinates = true;
-		}
+    case filterSelectorStart:
+    {
+        sSPBasic = filterRecord->sSPBasic;
+        if (filterRecord->bigDocumentData != NULL) {
+            filterRecord->bigDocumentData->PluginUsing32BitCoordinates = true;
+        }
 
-		executeFilter(filterRecord);
+        executeFilter(filterRecord);
 
-		break;
-	}
-	default:
-		break;
-	}
+        break;
+    }
+    default:
+        break;
+    }
 
-	return;
+    return;
 }
 ~~~~~~
 
@@ -1732,12 +1743,12 @@ that of the Automation plug-in we made previously:
 #include "tutorial_globals.h"
 
 #ifdef __PIMac__
-	#include "PIGeneral.r"
-	#include "PIUtilities.r"
+    #include "PIGeneral.r"
+    #include "PIUtilities.r"
 #elif defined(__PIWin__)
-	#define Rez
-	#include "PIGeneral.h"
-	#include "PIUtilities.r"
+    #define Rez
+    #include "PIGeneral.h"
+    #include "PIUtilities.r"
 #endif
 
 #include "PITerminology.h"
@@ -1745,103 +1756,103 @@ that of the Automation plug-in we made previously:
 
 resource 'PiPL' ( TUTORIAL_FILTER_RESOURCE_ID, TUTORIAL_FILTER_PLUGINNAME, purgeable )
 {
-	{
-		Kind { Filter },
-		Name { TUTORIAL_FILTER_PLUGINNAME },
-		Version { (latestFilterVersion << 16) | latestFilterSubVersion },
+    {
+        Kind { Filter },
+        Name { TUTORIAL_FILTER_PLUGINNAME },
+        Version { (latestFilterVersion << 16) | latestFilterSubVersion },
 
-		Component { ComponentNumber, TUTORIAL_FILTER_PLUGINNAME },
+        Component { ComponentNumber, TUTORIAL_FILTER_PLUGINNAME },
 
-		#ifdef __PIMac__
-			CodeMacIntel64 { "PluginMain" },
-		#else
-			#if defined(_WIN64)
-				CodeWin64X86 { "PluginMain" },
-			#else
-				CodeWin32X86 { "PluginMain" },
-			#endif
-		#endif
+        #ifdef __PIMac__
+            CodeMacIntel64 { "PluginMain" },
+        #else
+            #if defined(_WIN64)
+                CodeWin64X86 { "PluginMain" },
+            #else
+                CodeWin32X86 { "PluginMain" },
+            #endif
+        #endif
 
-		EnableInfo { "true" },
-		HasTerminology { TUTORIAL_FILTER_CLASS_ID,
-						 TUTORIAL_FILTER_EVENT_ID,
-						 TUTORIAL_FILTER_RESOURCE_ID,
-						 TUTORIAL_FILTER_UUID },
-		FilterCaseInfo
-		{
-			{
-				inWhiteMat, outWhiteMat,
-				doNotWriteOutsideSelection,
-				filtersLayerMasks, worksWithBlankData,
-				copySourceToDestination,
+        EnableInfo { "true" },
+        HasTerminology { TUTORIAL_FILTER_CLASS_ID,
+                         TUTORIAL_FILTER_EVENT_ID,
+                         TUTORIAL_FILTER_RESOURCE_ID,
+                         TUTORIAL_FILTER_UUID },
+        FilterCaseInfo
+        {
+            {
+                inWhiteMat, outWhiteMat,
+                doNotWriteOutsideSelection,
+                filtersLayerMasks, worksWithBlankData,
+                copySourceToDestination,
 
-				inWhiteMat, outWhiteMat,
-				writeOutsideSelection,
-				filtersLayerMasks, worksWithBlankData,
-				copySourceToDestination,
+                inWhiteMat, outWhiteMat,
+                writeOutsideSelection,
+                filtersLayerMasks, worksWithBlankData,
+                copySourceToDestination,
 
-				inWhiteMat, outWhiteMat,
-				writeOutsideSelection,
-				filtersLayerMasks, worksWithBlankData,
-				copySourceToDestination,
+                inWhiteMat, outWhiteMat,
+                writeOutsideSelection,
+                filtersLayerMasks, worksWithBlankData,
+                copySourceToDestination,
 
-				inWhiteMat, outWhiteMat,
-				doNotWriteOutsideSelection,
-				filtersLayerMasks, worksWithBlankData,
-				copySourceToDestination,
+                inWhiteMat, outWhiteMat,
+                doNotWriteOutsideSelection,
+                filtersLayerMasks, worksWithBlankData,
+                copySourceToDestination,
 
-				inWhiteMat, outWhiteMat,
-				writeOutsideSelection,
-				filtersLayerMasks, worksWithBlankData,
-				copySourceToDestination,
+                inWhiteMat, outWhiteMat,
+                writeOutsideSelection,
+                filtersLayerMasks, worksWithBlankData,
+                copySourceToDestination,
 
-				inWhiteMat, outWhiteMat,
-				doNotWriteOutsideSelection,
-				filtersLayerMasks, worksWithBlankData,
-				copySourceToDestination,
+                inWhiteMat, outWhiteMat,
+                doNotWriteOutsideSelection,
+                filtersLayerMasks, worksWithBlankData,
+                copySourceToDestination,
 
-				inWhiteMat, outWhiteMat,
-				writeOutsideSelection,
-				filtersLayerMasks, worksWithBlankData,
-				copySourceToDestination
-			}
-		},
-	}
+                inWhiteMat, outWhiteMat,
+                writeOutsideSelection,
+                filtersLayerMasks, worksWithBlankData,
+                copySourceToDestination
+            }
+        },
+    }
 };
 
 
 resource 'aete' ( TUTORIAL_FILTER_RESOURCE_ID, " dictionary", purgeable)
 {
-	1, 0, english, roman,									/* aete version and language specifiers */
-	{
-		TUTORIAL_FILTER_VENDORNAME,	/* vendor suite name */
-		TUTORIAL_FILTER_PLUGINDESC,	/* optional description */
-		TUTORIAL_FILTER_SUITE_ID,		/* suite ID */
-		1,													/* suite code, must be 1 */
-		1,													/* suite level, must be 1 */
-		{													/* structure for filters */
-			TUTORIAL_FILTER_PLUGINNAME,	/* unique filter name */
-			TUTORIAL_FILTER_PLUGINDESC,	/* optional description */
-			TUTORIAL_FILTER_CLASS_ID,		/* class ID, must be unique or Suite ID */
-			TUTORIAL_FILTER_EVENT_ID,		/* event ID, must be unique to class ID */
+    1, 0, english, roman,                                   /* aete version and language specifiers */
+    {
+        TUTORIAL_FILTER_VENDORNAME,     /* vendor suite name */
+        TUTORIAL_FILTER_PLUGINDESC,     /* optional description */
+        TUTORIAL_FILTER_SUITE_ID,       /* suite ID */
+        1,                                                  /* suite code, must be 1 */
+        1,                                                  /* suite level, must be 1 */
+        {                                                   /* structure for filters */
+            TUTORIAL_FILTER_PLUGINNAME,     /* unique filter name */
+            TUTORIAL_FILTER_PLUGINDESC,     /* optional description */
+            TUTORIAL_FILTER_CLASS_ID,       /* class ID, must be unique or Suite ID */
+            TUTORIAL_FILTER_EVENT_ID,       /* event ID, must be unique to class ID */
 
-			NO_REPLY,										/* never a reply */
-			IMAGE_DIRECT_PARAMETER,						/* direct parameter, used by Photoshop */
-			{												/* parameters here, if any */
-				TUTORIAL_FILTER_TRIGGERNAME,
-				TUTORIAL_FILTER_KEYTRIGGER,
-				TUTORIAL_FILTER_TYPETRIGGER,
-				TUTORIAL_FILTER_TRIGGERDESC,
-				flagsSingleParameter
-			}
-		},
-		{													/* non-filter plug-in class here */
-		},
-		{													/* comparison ops (not supported) */
-		},
-		{													/* any enumerations */
-		}
-	}
+            NO_REPLY,                                       /* never a reply */
+            IMAGE_DIRECT_PARAMETER,                         /* direct parameter, used by Photoshop */
+            {                                               /* parameters here, if any */
+                TUTORIAL_FILTER_TRIGGERNAME,
+                TUTORIAL_FILTER_KEYTRIGGER,
+                TUTORIAL_FILTER_TYPETRIGGER,
+                TUTORIAL_FILTER_TRIGGERDESC,
+                flagsSingleParameter
+            }
+        },
+        {                                                   /* non-filter plug-in class here */
+        },
+        {                                                   /* comparison ops (not supported) */
+        },
+        {                                                   /* any enumerations */
+        }
+    }
 };
 ~~~~~~
 
@@ -1968,16 +1979,315 @@ endlocal
 exit /b %errorlevel%
 ~~~~~~
 
+You'll notice that we're skipping creating a `.zxp` package and signing it in
+this one; you can figure that out if you need to actually end up deploying by
+referring to the earlier Section [Package signing]. For now, let's just focus on
+development and faster builds.
+
 You should be able to now build this and get a `.8bf` file (which is the
 extension for Photoshop filter plug-ins).
 
-## Getting to the layers ##
+## Accessing layer data  ##
 
-If you were paying attention to what you were copying, you'd have noticed that
+Let's actually start doing something with that `FilterRecordPtr` we have and
+start filling up our `executeFilter` function with some meat.
+
+First, we'll get a pointer to the `ReadImageDocumentDesc` struct that is passed
+in from our `FilterRecordPtr`, which essentially gives me access to the entire
+Photoshop document's data (at least, the data that is publicly exposed to us
+through the API), and then we get access to the layers in the document through
+the `ReadLayerDesc` pointer, which, as we can see, is a linked list of
+`ReadLayerDesc` structs containing information about each layer.
+
+~~~~~~cpp
+    ReadImageDocumentDesc *docInfo = filterRecord->documentInfo;
+    assert(docInfo != NULL);
+    if (docInfo->layerCount == 0) {
+        return;
+    }
+
+    ReadLayerDesc *layerDesc = docInfo->layersDescriptor;
+    if (layerDesc == NULL) {
+        return;
+    }
+~~~~~~
+
+We then create a temporary directory to prepare for storing our exported images,
+and walk the linked list of layers to start extracting out data from them.
+
+~~~~~~cpp
+    // NOTE: (sonictk) Create a temporary directory to store the output images.
+    char *tempDirPath = (char *)malloc(MAX_PATH * sizeof(char));
+    DWORD lenTempDirPath = GetTempPathA((DWORD)MAX_PATH, (LPSTR)tempDirPath);
+    DWORD fileAttrs = GetFileAttributes((LPCTSTR)tempDirPath);
+    if (!(fileAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
+        CreateDirectory((LPCSTR)tempDirPath, NULL);
+    }
+~~~~~~
+
+With the temporary directory in hand and our access point to the layer data, we
+can now walk the linked list:
+
+~~~~~~cpp
+    int layersLeftToProcess = docInfo->layerCount;
+    int validLayers = 0;
+    int progressTotal = layersLeftToProcess;
+    int progressCounter = 0;
+    do {
+        ++progressCounter;
+        --layersLeftToProcess;
+
+        const char *layerName = layerDesc->name;
+        if (layerName == NULL || layerName[0] == '\0') {
+            layerDesc = layerDesc->next;
+            continue;
+        }
+
+        char outPath[MAX_PATH];
+        int lenPath = snprintf(outPath, 0, "%s%c%s.jpg", tempDirPath, OS_PATH_SEP, layerName);
+        snprintf(outPath, lenPath + 1, "%s%c%s.jpg", tempDirPath, OS_PATH_SEP, layerName);
+
+        // TODO: (sonictk) Read the image pixels and write the output jpg.
+
+        ++validLayers;
+
+        if (layerDesc->next != NULL) {
+            layerDesc = layerDesc->next;
+        }
+    } while (layersLeftToProcess > 0 && layerDesc != NULL);
+
+    free(tempDirPath);
+
+    return;
+~~~~~~
+
+As you can see, we skip layers with empty names, (since that's not possible
+through the Photoshop GUI under normal circumstances anyway), format an output
+filename for each layer, and then we (presumably for now) read the image pixels,
+write them out to disk, and go to the next layer.
+
+Before we continue with reading the image pixels, let's do something quick and
+hook up the built-in Photoshop progress indicator:
+
+~~~~~~cpp
+        // More code here
+        // TODO: (sonictk) Read the image pixels and write the output jpg.
+
+        gFilterRecord->progressProc(progressCounter, progressTotal);
+        if (gFilterRecord->abortProc()) {
+            break;
+        }
+
+        ++validLayers;
+
+        // More code here
+~~~~~~
+
+This will cause Photoshop to display a progress bar automatically should the
+export process take a "long time" (which Photoshop gets to determine,
+unfortunately), but more importantly, allows the end-user to cancel the
+operation by virtue of us checking the `abortProc** calback function.
+
+So now that we've got that squared away, let's continue with the process of
+reading the layer data. But first, a little primer on how Photoshop stores layer
+data.
+
+### Planar-order and pixel-order ###
+
+For reasons (not unreasonable ones), Photoshop stores its pixel data differently
+from what you might expect. We're very used to image APIs that read and write
+data in **pixel-order format**, where we generally read the red pixel's value,
+then followed by the green one, and finally the blue one (and alpha as well if
+present). However, because Photoshop's design allows for any arbitrary number of
+channels to be present in a document, this access pattern quickly falls apart
+for certain use cases. Thus, the data for each layer is stored in a linked list
+of **channels**, which are basically `ReadChannelDesc` structs (found in `PIGeneral.h`):
+
+~~~~~~cpp
+typedef struct ReadChannelDesc
+{
+
+	int32 minVersion;	  /**< The minimum version needed to interpret this record. */
+	int32 maxVersion;	  /**< The maximum version allowable to interpret this record. */
+
+	//---------------------------------------------------------------------------
+	//	Version 0 fields:
+	//---------------------------------------------------------------------------
+
+	struct ReadChannelDesc *next;	/**< Next descriptor in the list. */
+
+	PIChannelPort port;		/**< Port to use for reading. Provided by host. */
+
+	VRect bounds;			/**< Bounds of the channel data. */
+	int32 depth;			/**< Depth of the data; horizontal and vertical resolution. */
+
+	VPoint tileSize;		/**< Size of the tiles, set by the host. The plug-in should use
+								 this size if possible to optimize and match the host memory
+								 scheme. */
+	VPoint tileOrigin;		/**< Origin for the tiles, set by host. */
+
+	Boolean target;			/**< Indicates if this a target channel. TRUE if so. */
+	Boolean shown;			/**< Indicates if this channel is visible.  TRUE if so. */
+
+	int16 channelType;		/**< Channel type. See @ref ChannelTypes. */
+
+	void *contextInfo;		/**< Pointer to additional information dependent on context. */
+
+	const char *name;		/**< Name of the channel as a C string. */
+
+	//---------------------------------------------------------------------------
+	//	Version 1 fields:
+	//---------------------------------------------------------------------------
+	// New in version 1
+
+	PIChannelPort writePort; /**< Port to use for writing if writing is allowed.
+								  This generally does not point back to the same collection
+								  of pixels. */
+	//---------------------------------------------------------------------------
+	//	Version 2 fields:
+	//---------------------------------------------------------------------------
+	// New in version 2
+
+	unsigned32 alphaID;		/**< Persistent ID for the channel. Only set for alpha
+							     channels. */
+
+	// New in version 3
+
+	const uint16 *unicodeName;		/**< Name of the channel as a Unicode string. (platform endianess) */
+
+	//---------------------------------------------------------------------------
+	//	Version 4 fields: (added in Photoshop CS3/10)
+	//---------------------------------------------------------------------------
+
+	// New in version 4
+
+	Boolean isEnabled;			/**< Indicates if the read channel is enabled.  Used for layer
+									 masks and vector masks that can be disabled. */
+
+	//---------------------------------------------------------------------------
+	//	Version 5 fields:
+	//---------------------------------------------------------------------------
+	// New in version 5
+
+	VRect limitBounds;			/**< Bounds trimmed to transparency. */
+
+
+  #ifdef __cplusplus
+	ReadChannelDesc()
+		: minVersion(0), maxVersion(0), next(NULL), port(NULL), depth(0),
+		target(false), shown(false), channelType(0), contextInfo(NULL),
+		name(NULL), writePort(NULL), alphaID(0), unicodeName(NULL), isEnabled(true) {}
+  #endif // __cplusplus				/**< ReadChannelDesc constructor. */
+
+} ReadChannelDesc;
+~~~~~~
+
+We see that there is a `port` member here that implies we should be using this
+to read the data from the channel. We'll deal with this later. But more
+importantly, this also implies that Photoshop stores layer data in a more
+channel, or *plane-oriented* manner, also known as in **planar-order format**,
+where each separate plane of pixels is stored continguously. To illustrate this
+better, I've provided a diagram below:
+
+***********************************************************
+*                                                         *
+*   Pixel-order format (RGB, RGB, RGB, ...)               *
+*                                                         *
+*   +-------------------------+                           *
+*   | RGB RGB RGB RGB RGB RGB |                           *
+*   | RGB RGB RGB RGB RGB RGB |                           *
+*   | RGB RGB RGB RGB RGB RGB |  6 x 6 x 3 bytes          *
+*   | RGB RGB RGB RGB RGB RGB |  (1 byte-per-channel)     *
+*   | RGB RGB RGB RGB RGB RGB |                           *
+*   | RGB RGB RGB RGB RGB RGB |                           *
+*   +-------------------------+                           *
+*                                                         *
+*                                                         *
+*    Planar-order format (R, R, ... G, G, ... B, B)       *
+*                                                         *
+*                                                         *
+*   +-------------+  Each plane is 6 x 6 bytes            *
+*   | R R R R R R |  (1 byte-per-channel)                 *
+*   | R R R R R R |                                       *
+*   | R R R R R R +------+                                *
+*   | R R R R R R |      |                                *
+*   | R R R R R R |      |                                *
+*   | R R R R R R |      |                                *
+*   +-------------+      |  Image planes representation   *
+*                        |                                *
+*   +-------------+      |              +-------------+   *
+*   | G G G G G G |      |              | B B B B B B |   *
+*   | G G G G G G |      |          +-------------+ B |   *
+*   | G G G G G G |      |          | G G G G G G | B |   *
+*   | G G G G G G +------+      +-------------+ G | B |   *
+*   | G G G G G G |      |      | R R R R R R | G | B |   *
+*   | G G G G G G |      +-->   | R R R R R R | G | B |   *
+*   +-------------+      |      | R R R R R R | G |---+   *
+*                        |      | R R R R R R | G |       *
+*   +-------------+      |      | R R R R R R |---+       *
+*   | B B B B B B |      |      | R R R R R R |           *
+*   | B B B B B B |      |      +-------------+           *
+*   | B B B B B B |      |                                *
+*   | B B B B B B +------+                 |              *
+*   | B B B B B B |                        |              *
+*   | B B B B B B |                        |              *
+*   +-------------+                        |              *
+*                                          v              *
+*                                                         *
+*                                  +-------------+        *
+*                                  | R R R R R R |        *
+*                                  | R R R R R R |        *
+*                                  | R R R R R R |        *
+*                                  | R R R R R R |        *
+*        Actual memory layout      | R R R R R R |        *
+*         we will get if we just   | R R R R R R |        *
+*        read the planes without   | G G G G G G |        *
+*        transforming into         | G G G G G G |        *
+*        pixel-order format        | G G G G G G |        *
+*                                  | G G G G G G |        *
+*                                  | G G G G G G |        *
+*                                  | G G G G G G |        *
+*                                  | B B B B B B |        *
+*                                  | B B B B B B |        *
+*                                  | B B B B B B |        *
+*                                  | B B B B B B |        *
+*                                  | B B B B B B |        *
+*                                  | B B B B B B |        *
+*                                  +-------------+        *
+*                                                         *
+***********************************************************
+[Figure [diagram]: An overview of two common types of pixel layouts used to represent an image.]
+
 
 # Recipe: Using ImGui for Photoshop tools #
 
+## What is ImGui? ##
+
+## How this will work ##
+
+## Creating the window ##
+
+## Drawing ImGui ##
+
+## Integration with Photoshop ##
+
 # Recipe: Communicating between CEP panels and C++ plug-ins #
+
+## What is CSXS? ##
+
+## A sample CEP panel ##
+
+## Writing the C++ native plug-in ##
+
+## `SDKPlugPlug` to the rescue ##
+
+## CEP to C++ ##
+
+## C++ to CEP ##
+
+
+# Closing thoughts #
+
 
 # Credits #
 
