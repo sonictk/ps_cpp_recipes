@@ -999,6 +999,19 @@ trigger modifications on an existing open document's pixels.
     Photoshop plug-ins in general. If not, read the first recipe of this
     tutorial in Section [Recipe: Minimalist approach to Photoshop plug-ins].
 
+## Additional requirements ##
+
+Because we'll be writing JPG images to disk, I'll be making use of
+`stb_image_write.h` to handle that functionality (since this tutorial isn't
+about implementing a JPG format writer). You can get it from:
+
+https://github.com/nothings/stb/blob/master/stb_image_write.h
+
+Place that in a folder that you're including into your compilation settings, as
+per your build script.
+
+## The filter plug-in entry point ##
+
 I'll skip the research here and get to the point: we'll be utilizing a
 **Filter** plugin to accomplish this, since it gives us access to what we need
 in order to read the document pixels. If you take a look at the documentation to
@@ -2258,8 +2271,16 @@ better, I've provided a diagram below:
 ***********************************************************
 [Figure [diagram]: An overview of two common types of pixel layouts used to represent an image.]
 
+Because we'll be making use of `stb_image_write` to handle writing out our data,
+this means that we'll need to transform the data from planar-order to
+pixel-order in order to do so.
+
+But let's worry about that later, and get back to the `port` on our channel
+descriptor, and how to read pixels from it.
 
 # Recipe: Using ImGui for Photoshop tools #
+
+## Additional requirements ##
 
 ## What is ImGui? ##
 
@@ -2288,11 +2309,23 @@ better, I've provided a diagram below:
 
 # Closing thoughts #
 
+It's been a pretty long road to get to the end, but hopefully by now you should
+have more confidence about working with the Photoshop C++ SDK, and have a better
+appreciation for the legacy of an ageing codebase that still sees widespread use
+today, even as the SDK has been left to rot for quite a while in favour of the
+CEP layer and all sorts of newfangled web tech stacks. We have tons of artists
+using Photoshop, but the tooling available at the moment is pretty
+limited. Hopefully if you're called upon to in the future, you'll be able to
+make a difference with your newfound knowledge.
+
+If you see any errors or have any questions about this tutorial, feel free to
+[file an issue](https://github.com/sonictk/ps_cpp_recipes/issues) on the Github repo.
 
 # Credits #
 
-* Tom Ruark, for assisting with some of my queries.
+* Tom Ruark of Adobe, for helping to assist with some of my queries.
 
+* [Sean Barrett](https://github.com/nothings/stb), for the `stb` libraries which we make use of in this tutorial.
 
 <style class="fallback">body{visibility:hidden}</style><script>markdeepOptions={tocStyle:'medium'};</script>
 <!-- Markdeep: --><script src="https://casual-effects.com/markdeep/latest/markdeep.min.js?" charset="utf-8"></script>
