@@ -2275,8 +2275,21 @@ Because we'll be making use of `stb_image_write` to handle writing out our data,
 this means that we'll need to transform the data from planar-order to
 pixel-order in order to do so.
 
-But let's worry about that later, and get back to the `port` on our channel
+But let's worry about that later, and get back to the `port** on our channel
 descriptor, and how to read pixels from it.
+
+### PICA and Ports ###
+
+!!! note What is PICA?
+    The name Adobe gives to its API for working with external plug-ins is called
+    **Plug-in Component Architecture**, or **PICA** for short. So if you see
+    headers in the SDK that begin with the `PI` prefix, you know where that
+    comes from now!
+
+    More information about PICA and the other `SP` API "suites", as Adobe calls
+    them, are also available in the SDK in the document called `PICA.pdf`.
+
+
 
 # Recipe: Using ImGui for Photoshop tools #
 
