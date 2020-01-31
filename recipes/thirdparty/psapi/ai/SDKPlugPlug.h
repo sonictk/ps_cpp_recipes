@@ -13,7 +13,7 @@
 //
 //========================================================================================
 
-// NOTE: (yliangsiew) This file has been modified to work with Adobe Photoshop.
+// NOTE: (sonictk) This file has been modified to work with Adobe Photoshop.
 
 #ifndef __SDKPLUGPLUG_H__
 #define __SDKPLUGPLUG_H__

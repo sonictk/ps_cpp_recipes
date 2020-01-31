@@ -13,7 +13,7 @@
 //
 //========================================================================================
 
-// NOTE: (yliangsiew) This file has been modified to work in Adobe Photoshop and only for Win32 environments.
+// NOTE: (sonictk) This file has been modified to work in Adobe Photoshop and only for Win32 environments.
 // Equivalent MacOS functionality would have to be ported in if required.
 
 #include "SDKPlugPlug.h"
@@ -41,7 +41,7 @@ SPErr SDKPlugPlug::Load()
 	SPErr err = kNoErr;
 
 	do {
-		// NOTE: (yliangsiew) Find the DLL location dynamically instead of having it hard-coded
+		// NOTE: (sonictk) Find the DLL location dynamically instead of having it hard-coded
 		// to a specific file path, since this can change depending on the Photoshop install location
 		// in various deployment systems.
 		std::string libName = PSFindPlugPlugDLLFileName();

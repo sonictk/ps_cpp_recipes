@@ -18,6 +18,7 @@ resource 'PiPL' ( TUTORIAL_FILTER_RESOURCE_ID, TUTORIAL_FILTER_PLUGINNAME, purge
 	{
 		Kind { Filter },
 		Name { TUTORIAL_FILTER_PLUGINNAME },
+		// Category { "**Hidden**" }, // This is so that the filter doesn't show up in the UI
 		Version { (latestFilterVersion << 16) | latestFilterSubVersion },
 
 		Component { ComponentNumber, TUTORIAL_FILTER_PLUGINNAME },

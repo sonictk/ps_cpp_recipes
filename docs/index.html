@@ -101,14 +101,12 @@ format:
   what my Emacs setup looks like, it's
   available [here](https://github.com/sonictk/lightweight-emacs).)
 
-- MSVC 2017 (Photoshop 2019).
+- MSVC 2017 (Photoshop CC 2019/2020).
 
 !!! warning MSVC Compiler versions
-    There's not much official information (if any) that I could find regarding
-    the recommended compiler versions that should be used to compile plugins for
-    each version of Photoshop. I've tested 2017 against Photoshop 2019 pretty
-    thoroughly and haven't found any major issues (I would assume 2019 would be
-    OK as well, since they are ABI-compatible).
+    You should use the recommended MSVC compiler that Photoshop was built with.
+    Information on this is available in the SDK documentation, under:
+    `pluginsdk/documentation/html/buildinfo.html`.
 
 - The Adobe Photoshop SDK for your particular version of Photoshop.
   They can be downloaded from the following location:
@@ -444,7 +442,7 @@ illustrated in the diagram below:
 *                               |   MSVC linker                    *
 *              +----------------v------------------+               *
 *              |                                   |               *
-*              |        DLL plug-in                |               *
+*              |   DLL plug-in (.8li, .8bf etc)    |               *
 *              | that actually gets loaded into PS |               *
 *              +-----------------+-----------------+               *
 *    +----------------------+    |                                 *
@@ -851,7 +849,9 @@ your plug-in.
 
 !!! warning Threading in Photoshop plug-ins
     Basically, **no**. The Photoshop API is **not thread-safe**, so threading in
-    plug-ins is generally not advisable.
+    plug-ins is generally not advisable. There's a whole host of other
+    restrictions that Adobe has laid out, which you can read in the FAQ section
+    of the SDK documentation. (`pluginsdk/documentation/html/faqs.html#a313`)
 
 Now that we have a basic build-deploy-debug workflow going, we can finally start
 to do something mildly useful with it.
@@ -2120,77 +2120,77 @@ of **channels**, which are basically `ReadChannelDesc` structs (found in `PIGene
 typedef struct ReadChannelDesc
 {
 
-	int32 minVersion;	  /**< The minimum version needed to interpret this record. */
-	int32 maxVersion;	  /**< The maximum version allowable to interpret this record. */
+    int32 minVersion;     /**< The minimum version needed to interpret this record. */
+    int32 maxVersion;     /**< The maximum version allowable to interpret this record. */
 
-	//---------------------------------------------------------------------------
-	//	Version 0 fields:
-	//---------------------------------------------------------------------------
+    //---------------------------------------------------------------------------
+    //  Version 0 fields:
+    //---------------------------------------------------------------------------
 
-	struct ReadChannelDesc *next;	/**< Next descriptor in the list. */
+    struct ReadChannelDesc *next;   /**< Next descriptor in the list. */
 
-	PIChannelPort port;		/**< Port to use for reading. Provided by host. */
+    PIChannelPort port;         /**< Port to use for reading. Provided by host. */
 
-	VRect bounds;			/**< Bounds of the channel data. */
-	int32 depth;			/**< Depth of the data; horizontal and vertical resolution. */
+    VRect bounds;           /**< Bounds of the channel data. */
+    int32 depth;            /**< Depth of the data; horizontal and vertical resolution. */
 
-	VPoint tileSize;		/**< Size of the tiles, set by the host. The plug-in should use
-								 this size if possible to optimize and match the host memory
-								 scheme. */
-	VPoint tileOrigin;		/**< Origin for the tiles, set by host. */
+    VPoint tileSize;        /**< Size of the tiles, set by the host. The plug-in should use
+                                 this size if possible to optimize and match the host memory
+                                 scheme. */
+    VPoint tileOrigin;      /**< Origin for the tiles, set by host. */
 
-	Boolean target;			/**< Indicates if this a target channel. TRUE if so. */
-	Boolean shown;			/**< Indicates if this channel is visible.  TRUE if so. */
+    Boolean target;             /**< Indicates if this a target channel. TRUE if so. */
+    Boolean shown;          /**< Indicates if this channel is visible.  TRUE if so. */
 
-	int16 channelType;		/**< Channel type. See @ref ChannelTypes. */
+    int16 channelType;      /**< Channel type. See @ref ChannelTypes. */
 
-	void *contextInfo;		/**< Pointer to additional information dependent on context. */
+    void *contextInfo;      /**< Pointer to additional information dependent on context. */
 
-	const char *name;		/**< Name of the channel as a C string. */
+    const char *name;       /**< Name of the channel as a C string. */
 
-	//---------------------------------------------------------------------------
-	//	Version 1 fields:
-	//---------------------------------------------------------------------------
-	// New in version 1
+    //---------------------------------------------------------------------------
+    //  Version 1 fields:
+    //---------------------------------------------------------------------------
+    // New in version 1
 
-	PIChannelPort writePort; /**< Port to use for writing if writing is allowed.
-								  This generally does not point back to the same collection
-								  of pixels. */
-	//---------------------------------------------------------------------------
-	//	Version 2 fields:
-	//---------------------------------------------------------------------------
-	// New in version 2
+    PIChannelPort writePort; /**< Port to use for writing if writing is allowed.
+                                  This generally does not point back to the same collection
+                                  of pixels. */
+    //---------------------------------------------------------------------------
+    //  Version 2 fields:
+    //---------------------------------------------------------------------------
+    // New in version 2
 
-	unsigned32 alphaID;		/**< Persistent ID for the channel. Only set for alpha
-							     channels. */
+    unsigned32 alphaID;         /**< Persistent ID for the channel. Only set for alpha
+                                 channels. */
 
-	// New in version 3
+    // New in version 3
 
-	const uint16 *unicodeName;		/**< Name of the channel as a Unicode string. (platform endianess) */
+    const uint16 *unicodeName;      /**< Name of the channel as a Unicode string. (platform endianess) */
 
-	//---------------------------------------------------------------------------
-	//	Version 4 fields: (added in Photoshop CS3/10)
-	//---------------------------------------------------------------------------
+    //---------------------------------------------------------------------------
+    //  Version 4 fields: (added in Photoshop CS3/10)
+    //---------------------------------------------------------------------------
 
-	// New in version 4
+    // New in version 4
 
-	Boolean isEnabled;			/**< Indicates if the read channel is enabled.  Used for layer
-									 masks and vector masks that can be disabled. */
+    Boolean isEnabled;          /**< Indicates if the read channel is enabled.  Used for layer
+                                     masks and vector masks that can be disabled. */
 
-	//---------------------------------------------------------------------------
-	//	Version 5 fields:
-	//---------------------------------------------------------------------------
-	// New in version 5
+    //---------------------------------------------------------------------------
+    //  Version 5 fields:
+    //---------------------------------------------------------------------------
+    // New in version 5
 
-	VRect limitBounds;			/**< Bounds trimmed to transparency. */
+    VRect limitBounds;          /**< Bounds trimmed to transparency. */
 
 
   #ifdef __cplusplus
-	ReadChannelDesc()
-		: minVersion(0), maxVersion(0), next(NULL), port(NULL), depth(0),
-		target(false), shown(false), channelType(0), contextInfo(NULL),
-		name(NULL), writePort(NULL), alphaID(0), unicodeName(NULL), isEnabled(true) {}
-  #endif // __cplusplus				/**< ReadChannelDesc constructor. */
+    ReadChannelDesc()
+        : minVersion(0), maxVersion(0), next(NULL), port(NULL), depth(0),
+        target(false), shown(false), channelType(0), contextInfo(NULL),
+        name(NULL), writePort(NULL), alphaID(0), unicodeName(NULL), isEnabled(true) {}
+  #endif // __cplusplus                 /**< ReadChannelDesc constructor. */
 
 } ReadChannelDesc;
 ~~~~~~
@@ -2275,10 +2275,93 @@ Because we'll be making use of `stb_image_write` to handle writing out our data,
 this means that we'll need to transform the data from planar-order to
 pixel-order in order to do so.
 
-But let's worry about that later, and get back to the `port** on our channel
-descriptor, and how to read pixels from it.
+Let's now access the different channels/planes of our various layers. In each
+`ReadLayerDesc` structure, there is a `compositeChannelsList` pointer to a
+linked list of `ReadChannelDesc` structures, each of which contains the data for
+a single channel in the current layer. Since we're going to only be writing out
+JPGs for now, we'll focus on the red, green and blue channels.
+
+Adding some code to the function above in order to figure out which channels
+we're interested in will look like this:
+
+~~~~~~cpp
+#define PS_CHANNEL_ID_RED 1
+#define PS_CHANNEL_ID_GREEN 2
+#define PS_CHANNEL_ID_BLUE 3
+
+
+void findRGBChannelsForLayer(const ReadLayerDesc *layerDesc, ReadChannelDesc **rChn, ReadChannelDesc **gChn, ReadChannelDesc **bChn)
+{
+    ReadChannelDesc *curChn = layerDesc->compositeChannelsList;
+    while (curChn != NULL) {
+        int32_t tileHeight = curChn->tileSize.v;
+        int32_t tileWidth = curChn->tileSize.h;
+        if (tileHeight == 0 || tileWidth == 0) {
+            curChn = curChn->next;
+            continue;
+        }
+
+        switch (curChn->channelType) {
+        case PS_CHANNEL_ID_RED:
+            *rChn = curChn;
+            break;
+        case PS_CHANNEL_ID_GREEN:
+            *gChn = curChn;
+            break;
+        case PS_CHANNEL_ID_BLUE:
+            *bChn = curChn;
+            break;
+        default:
+            break;
+        }
+        curChn = curChn->next;
+    }
+
+    return;
+}
+
+// ...
+
+        snprintf(outPath, lenPath + 1, "%s%c%s.jpg", tempDirPath, OS_PATH_SEP, layerName);
+
+        ReadChannelDesc *rChn = NULL;
+        ReadChannelDesc *gChn = NULL;
+        ReadChannelDesc *bChn = NULL;
+        findRGBChannelsForLayer(layerDesc, &rChn, &gChn, &bChn);
+
+        int chnWidth = rChn->bounds.right - rChn->bounds.left;
+        int chnHeight = rChn->bounds.bottom - rChn->bounds.top;
+
+        gFilterRecord->progressProc(progressCounter, progressTotal);
+
+// ...
+~~~~~~
+
+"How do I know what the channel IDs are off the top of my head?", you might
+ask. The answer is unfortunately _just by debugging Photoshop itself
+manually_. (These channel IDs do not match that of the [Adobe Photoshop file
+format specification](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577409_75067),
+in case you were wondering.) In contrast the code itself is thankfully fairly simple;
+we keep walking the linked list of layers to find channels that match known
+channel IDs for red/green/blue channels, and update the pointers to them so that
+we can read from them next in the process.
+
+!!! warning The "non-production" code disclaimer reminder
+    Again, remember, this is _all_ code that is written purely to serve as an
+    example, so if you _were_ looking to try and make this code more robust, I'd
+    first and foremost be checking things like whether the document had all 3
+    R/G/B channels, whether those channels had non-null data pointers, etc.
+
+In order to read from the channel port, we'll be making use of some of the **PICA**
+functions that Photoshop exposes through the SDK to read from the port.
 
 ### PICA and Ports ###
+
+Ports in the PICA architecture are essentially Adobe's interfaces to
+reading/writing data from channels in Photoshop. There are read/write ports that
+you utilize, which under-the-hood basically do all sorts of things to pass the
+memory back-and-forth between API boundaries (yours, and Adobe's). While
+slightly annoying, it's not that big of a deal, as we will see in the next section.
 
 !!! note What is PICA?
     The name Adobe gives to its API for working with external plug-ins is called
@@ -2288,6 +2371,249 @@ descriptor, and how to read pixels from it.
 
     More information about PICA and the other `SP` API "suites", as Adobe calls
     them, are also available in the SDK in the document called `PICA.pdf`.
+
+Reading data from a channel descriptor is relatively straightforward, but before
+we do that, let's go over how Photoshop exposes the data to you.
+
+### Tiled data ###
+
+Because Photoshop documents can get _really_ large in dimensions (and thus
+memory usage), Photoshop itself will perform tiling in order to only load the
+specific regions it needs into memory (you can see this yourself when you zoom
+into a large document and start panning around; tile blocks load in as
+needed. This is also controllable in your Photoshop preferences, under the
+**Performance** category.)
+
+This is also reflected when reading the data from the port; you retrieve tiles
+of data from a read-only port, transform the data, and then either write it back
+to a write-only port (or take that data elsewhere and do things with it, as we
+will be performing in our example.
+
+Therefore, reading the tiled data looks like this:
+
+*********************************************************************************************
+*                                                                                           *
+*        <------- 512px ----------->                     4 tiles total                      *
+*                                                                                           *
+*    ^   +-------------------------+             +----------+  ^     +----------+           *
+*    |   |//////////               |             |//////////|  |     | next     |           *
+*    |   |//////////               |             |//////////|  |     | tile     |----+      *
+*    |   |//////////               |             |//////////| 128px  | to be    |    |      *
+*    |   |//////////               |             |//////////|  |     | copied   |    |---+  *
+*    |   |bbbbbbbbbb  <--------------------------|bbbbbbbbbb|  |     |          |    |   |  *
+* 512px  |                         |             +----------+  v     +----------+    |   |  *
+*    |   |   copy stride-by-stride |                                      |          |   |  *
+*    |   |                         |             <--128px -->             +----------+   |  *
+*    |   |                         |                                          |          |  *
+*    |   |                         |                                          +----------+  *
+*    |   |                         |                                                        *
+*    |   |                         |                                                        *
+*    |   |                         |                                                        *
+*    v   +-------------------------+                                                        *
+*          large buffer (document size)                                                     *
+*                                                                                           *
+*                                                                                           *
+*********************************************************************************************
+[Figure [diagram]: An overview of how reading from channel port descriptors into our final image buffer works.]
+
+And in code, it looks like this:
+~~~~~~cpp
+void readPSChannelDataIntoBuffer(const ReadChannelDesc *chn, uint8_t *buf, const int bufWidth, int *bytesRead)
+{
+    int tileHeight = chn->tileSize.v;
+    int tileWidth = chn->tileSize.h;
+
+    int chnHeight = chn->bounds.bottom - chn->bounds.top;
+    int chnWidth = chn->bounds.right - chn->bounds.left;
+    int numTilesVert = (tileHeight - 1 + chnHeight) / tileHeight;
+    int numTilesHoriz = (tileWidth - 1 + chnWidth) / tileWidth;
+    int chnSize = tileWidth * tileHeight * chn->depth / 8;
+    int numTiles = numTilesVert * numTilesHoriz;
+
+    int totalBytesRead = 0;
+    VRect curRect;
+    int curX = 0;
+    int curY = 0;
+    for (int vertTile = 0; vertTile < numTilesVert; ++vertTile) {
+        for (int horizTile = 0; horizTile < numTilesHoriz; ++horizTile) {
+            curY = tileHeight * vertTile;
+
+            PixelMemoryDesc pxMemDesc;
+            pxMemDesc.data = sPSBuffer->New(NULL, chnSize);
+            pxMemDesc.colBits = chn->depth;
+            pxMemDesc.bitOffset = 0;
+            pxMemDesc.depth = chn->depth;
+
+            curRect.top = vertTile * tileHeight;
+            curRect.left = horizTile * tileWidth;
+            curRect.bottom = curRect.top + tileHeight;
+            curRect.right = curRect.left + tileWidth;
+
+            if (curRect.bottom > chnHeight) {
+                curRect.bottom = chnHeight;
+            }
+            if (curRect.right > chnWidth) {
+                curRect.right = chnWidth;
+            }
+
+            pxMemDesc.rowBits = (curRect.right - curRect.left) * chn->depth;
+            int stride = pxMemDesc.rowBits / PS_NUM_OF_BITS_IN_ONE_BYTE;
+            sPSChannelProcs->ReadPixelsFromLevel(chn->port, 0, &curRect, &pxMemDesc);
+
+            int curRectWidth = curRect.right - curRect.left;
+            int curRectHeight = curRect.bottom - curRect.top;
+
+            int numBytesRead = curRectWidth * curRectHeight * (chn->depth / PS_NUM_OF_BITS_IN_ONE_BYTE);
+
+            for (int h=0; h < curRectHeight; ++h) {
+                memcpy(&buf[(curY * bufWidth) + curX],
+                       &((uint8_t *)(pxMemDesc.data))[curRectWidth * h],
+                       curRectWidth * sizeof(uint8_t));
+                curY++;
+            }
+
+            totalBytesRead += numBytesRead;
+
+            sPSBuffer->Dispose((Ptr *)&pxMemDesc.data);
+
+            curX = (curX + curRectWidth) % bufWidth;
+        }
+    }
+
+    *bytesRead = totalBytesRead;
+
+    return;
+}
+~~~~~~
+
+First, you see that we make use of a new struct known as a `PixelMemoryDesc`
+descriptor to describe the tile that we are about to read from Photoshop. You
+can then see that we make use of a new suite function, the `sPSBuffer->New` one,
+to handle allocation of the memory to read the pixel data for each tile into. We
+then use the `sPSChannelProcs->ReadPixelsFromLevel` function to acutally do the
+read, tile by tile. The rest of it is just basic math to copy, stride-by-stride,
+each row of pixels to its correct position in a combined buffer large enough to
+store all the tiles together.
+
+We'll do this for each of the red, green and blue channels:
+
+~~~~~~cpp
+    int bytesRead = 0;
+    readPSChannelDataIntoBuffer(rChn, rgbPxDataPlanar, chnWidth, &bytesRead);
+
+    int totalBytesRead = bytesRead;
+    readPSChannelDataIntoBuffer(gChn, rgbPxDataPlanar + totalBytesRead, chnWidth, &bytesRead);
+
+    totalBytesRead += bytesRead;
+    readPSChannelDataIntoBuffer(bChn, rgbPxDataPlanar + totalBytesRead, chnWidth, &bytesRead);
+~~~~~~
+
+### Writing out the JPGs ###
+
+And now comes the annoying part: converting the planar-order data to pixel-order
+format:
+
+~~~~~~cpp
+// remapValue()  is baiscally just converting a 8 bit integer to its 16/32 bit equivalent.
+uint8_t remapValue(const uint16_t &val)
+{
+    uint32_t valTypeRange = (uint32_t)(powf(2.0f, (float)(sizeof(uint16_t) * PS_NUM_OF_BITS_IN_ONE_BYTE) - 1));
+    uint32_t destTypeRange = (uint32_t)(powf(2.0f, (float)(sizeof(uint8_t) * PS_NUM_OF_BITS_IN_ONE_BYTE) - 1));
+    float factor = (float)destTypeRange / (float)valTypeRange;
+    uint8_t result = (uint8_t)(factor * (float)val);
+
+    return result;
+}
+
+
+uint8_t remapValue(const uint32_t &val)
+{
+    uint64_t valTypeRange = (uint64_t)(pow(2.0f, (float)(sizeof(uint32_t) * PS_NUM_OF_BITS_IN_ONE_BYTE) - 1));
+    uint64_t destTypeRange = (uint64_t)(pow(2.0f, (float)(sizeof(uint8_t) * PS_NUM_OF_BITS_IN_ONE_BYTE) - 1));
+    double factor = (double)destTypeRange / (double)valTypeRange;
+    uint8_t result = (uint8_t)(factor * (double)val);
+
+    return result;
+}
+
+
+void convertPlanarToPixelRGB(uint8_t *dest, const uint8_t *const src, const int width, const int height, const int bytesPerChannel)
+{
+    int numPixels = width * height;
+    int curPixelIdx = 0;
+    int i = 0;
+    for (; i < (numPixels * 3); i+=3) {
+        for (int chn=0; chn < 3; ++chn) {
+            switch (bytesPerChannel) {
+            case 1:
+                dest[i + chn] = src[(curPixelIdx * bytesPerChannel) + (numPixels * chn * bytesPerChannel)];
+                break;
+            case 2:
+            {
+                uint16_t *buffer16 = (uint16_t *)src;
+                uint16_t curVal = buffer16[curPixelIdx + (numPixels * chn)];
+                uint8_t remappedVal = remapValue(curVal);
+                dest[i + chn] = remappedVal;
+                break;
+            }
+            case 4:
+            {
+                uint32_t *buffer32 = (uint32_t *)src;
+                uint32_t curVal = buffer32[curPixelIdx + (numPixels * chn)];
+                uint8_t remappedVal = remapValue(curVal);
+                dest[i + chn] = remappedVal;
+                break;
+            }
+            default:
+                return;
+            }
+        }
+        ++curPixelIdx;
+    }
+
+    return;
+}
+~~~~~~
+
+Now that we have the data in pixel-order format, we can write out the JPG
+images. We're making use of [`stb_image_write`](https://github.com/nothings/stb/blob/master/stb_image_write.h)
+for this, thanks to Sean Barrett (you can, of course, use whatever method you
+want to write out the data, and in whatever format you'd like as well):
+
+~~~~~~cpp
+    stbi_write_jpg(jpgPath,
+                   chnWidth,
+                   chnHeight,
+                   3,
+                   rgbPxDataPixel,
+                   100);
+~~~~~~
+
+(If you're stuck, feel free to refer to the final code example in the repository.)
+
+Once you build and deploy the plugin, you should now see it available for use
+under the **Filter > Other** menu in Photoshop. Running it on a document with
+layers should result in them being exported to your `%TMP%` directory as JPGs,
+and (most likely) at a fraction of the time taken than it would have taken had
+you written this as a CEP panel calling into JSX to perform the export. Cool, huh?
+
+
+# Recipe: Using Automation plug-ins to call filters #
+
+So now that we've got our filter plug-in, let's combine our Automation plug-in
+from the first recipe with it so that artists can call this code to export their
+layers from the Automation menu, where they might be more accustomed to seeing
+their plug-in.
+
+!!! note Deja vu?
+    This is also illustrated in the SDK with the Automation/Hidden filter
+    plug-in example, but I'll be going over the minimalist version here, minus
+    all the extra stuff it does within the plug-in (UI, randomizing image
+    pixels, etc.) and focusing only on the core problem of calling the filter
+    from the automation plug-in itself.
+
+Let's modify the build script a little bit to build both plug-ins now:
+
 
 
 
@@ -2334,11 +2660,16 @@ make a difference with your newfound knowledge.
 If you see any errors or have any questions about this tutorial, feel free to
 [file an issue](https://github.com/sonictk/ps_cpp_recipes/issues) on the Github repo.
 
+
 # Credits #
 
 * Tom Ruark of Adobe, for helping to assist with some of my queries.
 
 * [Sean Barrett](https://github.com/nothings/stb), for the `stb` libraries which we make use of in this tutorial.
+
+* [Morgan Mcguire](https://casual-effects.com/markdeep/), for the Markdeep format.
+
+* Aras Pranckevicius, for writing the Markdeep theme used in this tutorial.
 
 <style class="fallback">body{visibility:hidden}</style><script>markdeepOptions={tocStyle:'medium'};</script>
 <!-- Markdeep: --><script src="https://casual-effects.com/markdeep/latest/markdeep.min.js?" charset="utf-8"></script>
