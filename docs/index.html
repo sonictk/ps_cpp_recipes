@@ -19,9 +19,6 @@ the following topics:
 
 * Combining an Automation to run a "hidden" Filter plugin;
 
-* Making our own GUI tools in Photoshop without going through CEP,
-  using [ImGui](https://github.com/ocornut/imgui);
-
 * Communicating between a traditional CEP panel in Photoshop and a native C++
   plugin using Adobe native CSXS events;
 
@@ -2612,26 +2609,363 @@ their plug-in.
     pixels, etc.) and focusing only on the core problem of calling the filter
     from the automation plug-in itself.
 
-Let's modify the build script a little bit to build both plug-ins now:
+For now, go ahead and copy-paste the source code from the first recipe to act as
+our automation plug-in for this purpose. Let's modify the build script a little
+bit to build both plug-ins now:
+
+## The build script ##
+
+~~~~~~batch
+@echo off
+setlocal
+
+echo Build script started executing at %time% ...
+set BuildType=%1
+if "%BuildType%"=="" (set BuildType=release)
+
+set PhotoshopSDKRoot=C:\Users\sonictk\src\thirdparty\adobe\photoshop\cc_2019_win\pluginsdk
+set CnvtPiPLExePath="%PhotoshopSDKRoot%\samplecode\resources\Cnvtpipl.exe"
+set PhotoshopPluginsDeployPath=C:\Users\sonictk\psplugins
+
+call "%vs2017installdir%\VC\Auxiliary\Build\vcvarsall.bat" x64
+
+set BuildDir=%~dp0msbuild
+if not exist %BuildDir% mkdir %BuildDir%
+pushd %BuildDir%
+
+set ProjectName=tutorial
+
+set AutoEntryPoint=%~dp0src\%ProjectName%_auto_main.cpp
+set AutoResourcePiPL=%~dp0src\%ProjectName%_auto_pipl.r
+set AutoResourceRC=%BuildDir%\%ProjectName%_auto_pipl.rc
+set AutoResourceRES=%BuildDir%\%ProjectName%_auto_pipl.res
+
+set FilterEntryPoint=%~dp0src\%ProjectName%_filter_main.cpp
+set FilterResourcePiPL=%~dp0src\%ProjectName%_filter_pipl.r
+set FilterResourceRC=%BuildDir%\%ProjectName%_filter_pipl.rc
+set FilterResourceRES=%BuildDir%\%ProjectName%filter__pipl.res
+
+set ThirdPartyDirPath=%~dp0..\thirdparty
+
+set AutoOutBin=%BuildDir%\%ProjectName%_auto.8li
+set FilterOutBin=%BuildDir%\%ProjectName%_filter.8bf
+
+set CommonLinkerFlags=/dll /incremental:no /machine:x64 /nologo /defaultlib:Kernel32.lib /defaultlib:User32.lib /defaultlib:Shell32.lib /nodefaultlib:LIBCMTD.lib /nodefaultlib:LIBCMT.lib
+set DebugLinkerFlags=%CommonLinkerFlags% /opt:noref /debug
+set ReleaseLinkerFlags=%CommonLinkerFlags% /opt:ref
+set RelWithDebInfoLinkerFlags=%CommonLinkerFlags% /opt:ref /debug
+
+set FilterCommonLinkerFlags=/dll /incremental:no /machine:x64 /nologo /defaultlib:Kernel32.lib /defaultlib:Shlwapi.lib /defaultlib:User32.lib /defaultlib:Shell32.lib /defaultlib:Ole32.lib /defaultlib:Comctl32.lib /nodefaultlib:LIBCMTD.lib /nodefaultlib:LIBCMT.lib
+set FilterDebugLinkerFlags=%FilterCommonLinkerFlags% /opt:noref /debug /pdb:"%BuildDir%\%ProjectName%_filter.pdb" "%FilterResourceRES%"
+set FilterReleaseLinkerFlags=%FilterCommonLinkerFlags% /opt:ref "%FilterResourceRES%"
+set FilterRelWithDebInfoLinkerFlags=%FilterCommonLinkerFlags% /opt:ref /debug /pdb:"%BuildDir%\%FilterProjectName%.pdb" "%FilterResourceRES%"
+
+set PSPreprocessorDefines=/DISOLATION_AWARE_ENABLED=1 /DWIN32=1 /D_CRT_SECURE_NO_DEPRECATE /D_SCL_SECURE_NO_DEPRECATE /D_WINDOWS /D_USRDLL /D_WINDLL /D_MBCS
+set PSCompilerFlags=/EHsc
+set CommonIncludePaths=/I "%ThirdPartyDirPath%" /I "%ThirdPartyDirPath%\psapi\common\includes" /I "%ThirdPartyDirPath%\psapi\common\resources" /I "%ThirdPartyDirPath%\psapi\common\sources" /I "%ThirdPartyDirPath%\psapi\photoshop" /I "%ThirdPartyDirPath%\psapi\pica_sp" /I "%ThirdPartyDirPath%\psapi\resources" /I "%ThirdPartyDirPath%\psapi\ai" /I "%BuildDir%"
+set CommonCompilerFlags=/nologo /W3 /WX %CommonIncludePaths% /Zc:__cplusplus /arch:AVX2 %PSCompilerFlags% %PSPreprocessorDefines%
+set CompilerFlagsDebug=%CommonCompilerFlags% /Od /Zi /D_DEBUG /MDd
+set CompilerFlagsRelease=%CommonCompilerFlags% /Ox /DNDEBUG /MD
+set CompilerFlagsRelWithDebInfo=%CommonCompilerFlags% /Ox /Zi /DNDEBUG /MD
+
+set AutoLinkerFlagsDebug=%DebugLinkerFlags% /pdb:"%BuildDir%\%ProjectName%_auto.pdb" "%AutoResourceRES%"
+set AutoLinkerFlagsRelease=%ReleaseLinkerFlags% "%AutoResourceRES%"
+set AutoLinkerFlagsRelWithDebinfo=%RelWithDebInfoLinkerFlags% /pdb:"%BuildDir%\%ProjectName%_auto.pdb" "%AutoResourceRES%"
 
 
+if "%BuildType%"=="debug" (
+    set AutoBuildCommand=cl %CompilerFlagsDebug% "%AutoEntryPoint%" /Fe:"%AutoOutBin%" /link %AutoLinkerFlagsDebug%
+    set AutoBuildRRCommand=cl %CompilerFlagsDebug% /EP /DMSWindows=1 /Tc "%AutoResourcePiPL%"
+
+    set FilterBuildCommand=cl %CompilerFlagsDebug% "%FilterEntryPoint%" /Fe:"%FilterOutBin%" /link %FilterDebugLinkerFlags%
+    set FilterBuildRRCommand=cl %CompilerFlagsDebug% /EP /DMSWindows=1 /Tc "%FilterResourcePiPL%"
+) else if "%BuildType%"=="relwithdebinfo" (
+    set AutoBuildCommand=cl %CompilerFlagsRelWithDebInfo% "%AutoEntryPoint%" /Fe:"%AutoOutBin%" /link %AutoLinkerFlagsRelWithDebInfo%
+    set AutoBuildRRCommand=cl %CompilerFlagsRelWithDebInfo% /EP /DMSWindows=1 /Tc "%AutoResourcePiPL%"
+
+    set FilterBuildCommand=cl %CompilerFlagsRelWithDebInfo% "%FilterEntryPoint%" /Fe:"%FilterOutBin%" /link %FilterRelWithDebInfoLinkerFlags%
+    set FilterBuildRRCommand=cl %CompilerFlagsRelWithDebInfo% /EP /DMSWindows=1 /Tc "%FilterResourcePiPL%"
+) else (
+    set AutoBuildCommand=cl %CompilerFlagsRelease% "%AutoEntryPoint%" /Fe:"%AutoOutBin%" /link %AutoLinkerFlagsRelease%
+    set AutoBuildRRCommand=cl %CompilerFlagsRelease% /EP /DMSWindows=1 /Tc "%AutoResourcePiPL%"
+
+    set FilterBuildCommand=cl %CompilerFlagsRelease% "%FilterEntryPoint%" /Fe:"%FilterOutBin%" /link %FilterReleaseLinkerFlags%
+    set FilterBuildRRCommand=cl %CompilerFlagsRelease% /EP /DMSWindows=1 /Tc "%FilterResourcePiPL%"
+)
 
 
-# Recipe: Using ImGui for Photoshop tools #
+echo.
+echo Compiling resources (command follows below)...
+set AutoResourceRR=%BuildDir%\%ProjectName%_auto_pipl.rr
+set FilterResourceRR=%BuildDir%\%ProjectName%_filter_pipl.rr
 
-## Additional requirements ##
 
-## What is ImGui? ##
+echo %AutoBuildRRCommand%
+%AutoBuildRRCommand% > "%AutoResourceRR%"
+if %errorlevel% neq 0 goto error
 
-## How this will work ##
+echo %FilterBuildRRCommand%
+%FilterBuildRRCommand% > "%FilterResourceRR%"
+if %errorlevel% neq 0 goto error
 
-## Creating the window ##
+echo.
+echo Converting Automation PiPL to Windows resource file format...
+echo %CnvtPiPLExePath% "%AutoResourceRR%" "%AutoResourceRC%"
+%CnvtPiPLExePath% "%AutoResourceRR%" "%AutoResourceRC%"
+if %errorlevel% neq 0 goto error
 
-## Drawing ImGui ##
+echo.
+echo Converting Filter PiPL to Windows resource file format...
+echo %CnvtPiPLExePath% "%FilterResourceRR%" "%FilterResourceRC%"
+%CnvtPiPLExePath% "%FilterResourceRR%" "%FilterResourceRC%"
+if %errorlevel% neq 0 goto error
 
-## Integration with Photoshop ##
+echo.
+echo Compiling Windows Resources for automation plug-in...
+rc /v /fo "%AutoResourceRES%" "%AutoResourceRC%"
+if %errorlevel% neq 0 goto error
+
+echo.
+echo Compiling Windows Resources for filter plug-in...
+rc /v /fo "%FilterResourceRES%" "%FilterResourceRC%"
+if %errorlevel% neq 0 goto error
+
+
+echo.
+echo Compiling source files for automation plug-in (command follows below)...
+echo %AutoBuildCommand%
+echo.
+echo Output from compilation:
+%AutoBuildCommand%
+if %errorlevel% neq 0 goto error
+
+echo.
+echo Compiling source files for filter plug-in (command follows below)...
+echo %FilterBuildCommand%
+echo.
+echo Output from compilation:
+%FilterBuildCommand%
+if %errorlevel% neq 0 goto error
+
+
+echo.
+echo Deploying built binaries and symbols...
+copy /Y "%AutoOutBin%"  "%PhotoshopPluginsDeployPath%"
+if %errorlevel% neq 0 goto error
+
+echo.
+echo Deploying built binaries and symbols...
+copy /Y "%FilterOutBin%"  "%PhotoshopPluginsDeployPath%"
+if %errorlevel% neq 0 goto error
+
+if "%BuildType%"=="debug" (
+    copy /Y "%BuildDir%\%ProjectName%_auto.pdb" "%PhotoshopPluginsDeployPath%"
+    if %errorlevel% neq 0 goto error
+
+    copy /Y "%BuildDir%\%ProjectName%_filter.pdb" "%PhotoshopPluginsDeployPath%"
+    if %errorlevel% neq 0 goto error
+)
+
+if %errorlevel% == 0 goto success
+
+
+:error
+echo.
+echo ***************************************
+echo *      !!! An error occurred!!!       *
+echo ***************************************
+goto end
+
+
+:success
+echo.
+echo ***************************************
+echo *    Build completed successfully.    *
+echo ***************************************
+goto end
+
+
+:end
+echo.
+echo Build script finished execution at %time%.
+popd
+
+endlocal
+
+exit /b %errorlevel%
+~~~~~~
+
+Nothing really fancy; we're just duplicating the steps twice and compiling the
+filter and automation plug-ins separately (along with a bunch of options for the
+`.pdb` files depending on what build configuration we're using.) We're also
+sharing a single header file between the two that stores the various identifiers
+that the plug-ins use when registering with Photoshop, for reasons which will
+become clear later on.
+
+!!! warning
+    We also re-generate all UUIDs for these two new plug-ins, even if they are
+    functionally equivalent to the previous ones covered in earlier recipes, If
+    you don't, Photoshop might get confused as to which plug-in to register and
+    very odd behaviour can result.
+
+## Hiding the filter plug-in from the UI ##
+
+Now that we are building both plug-ins, let's make one change to the PIPL file
+for the filter plug-in:
+
+~~~~~~cpp
+		// ...
+		Name { TUTORIAL_FILTER_PLUGINNAME },
+		Category { "**Hidden**" },
+		Version { (latestFilterVersion << 16) | latestFilterSubVersion },
+		// ...
+~~~~~~
+
+We do this so that the filter itself doesn't show up in the Photoshop UI,
+allowing us to ensure that the end-user only has a single entry point via the UI
+to access our logic. This can be helpful if you, for example, need to do some
+sort of initialization or startup before running the filter plug-in. An example
+we're going to show right now is controlling the undo stack before activating
+the filter plug-in itself.
+
+## Calling the filter from an Automation plug-in ##
+
+So now, we'll actually have our automation plug-in do something other than print
+out "hello world". How exciting! Let's create a dummy function that will be
+called from the automation plug-in's entry point first:
+
+~~~~~~cpp
+	// ...
+	if (sSPBasic->IsEqual(caller, kPSPhotoshopCaller)) {
+		if (sSPBasic->IsEqual(selector, kPSDoIt)) {
+			PSActionsPlugInMessage *tmpMsg = (PSActionsPlugInMessage *)message;
+			status = MenuExecuteCB();
+		}
+	}
+    // ...
+~~~~~~
+
+And `MenuExecuteCB` looks like this:
+
+~~~~~~cpp
+SPErr MenuExecuteCB()
+{
+	SPErr status = kSPNoError;
+
+	Auto_Ref reference;
+	ASZString nameAsZString = NULL;
+	sPSUIHooks->GetPluginName(message->d.self, &nameAsZString);
+	sPSActionReference->PutEnumerated(reference.get(),
+									  classDocument,
+									  typeOrdinal,
+									  enumTarget);
+
+	sPSActionControl->SuspendHistory(reference.get(),
+									 ::ExecuteCB,
+									 NULL,
+									 nameAsZString);
+	sASZString->Release(nameAsZString);
+
+	return gError;
+}
+~~~~~~
+
+Now this will probably be unfamilar to you. What exactly is happening here?
+
+Well, as it turns out, the Automation plug-in is really Adobe's way of exposing
+the [Photoshop Actions](https://helpx.adobe.com/photoshop/using/actions-actions-panel.html)
+suite to you. If you're unfamiliar with Photoshop Actions, the lowdown is that
+they're basically a GUI feature that allows artists to batch together actions
+quickly by recording the steps that they've taken in a document (changing layer
+opacity, deleting a layer, making a selection, filling said selection etc.) and
+then playing them back again.
+
+Each Action has a **descriptor** that basically is metadata stored about the
+Action so that Photoshop knows what to actually _do_. This metadata varies
+between different types of actions, and can be anything from string parameters,
+floats, lists, etc.
+
+!!! tip More about Photoshop Actions
+    Because there is so little documentation on Photoshop Actions within the
+    SDK, my advice is to build the Listener plug-in within the SDK and use it to
+    record various types of Actions that you're interested in performing within
+    the scope of your plug-in. (It's also worth noting that actions can _only_
+    be performed from within Automation plug-ins)
+
+For now, the actions we're performing above basically "freeze" the history stack
+that Photoshop maintains while the ``ExecuteCB`` call is executing, and once
+it's done,  a single history item is stored with the exact name we specify. This
+improves the performance of your filter, and also reduces confusion for the
+end-user. You'll also note that we make use of various suites to perform these
+actions, which unfortunately isn't really well-documented either; you'll just
+have to get used to using the Listener plug-in and reading the various header
+files to get a sense of which functions are available under the various suites
+and which ones are appropriate for the Photoshop functionality that you're
+attempting to make use of.
+
+Let's implemente `ExecuteCB` now:
+
+~~~~~~cpp
+SPErr ExecuteCB(void *params)
+{
+	SPErr stat = kSPNoError;
+	Auto_Desc descriptor;
+	Auto_Desc result(false);
+
+	DescriptorTypeID workFilterEventID;
+	DescriptorEnumID workFilterEnumID = TUTORIAL_FILTER_ENUMINFO;
+	DescriptorEnumTypeID workFilterTypeID;
+
+	sPSActionDescriptor->PutEnumerated(descriptor.get(),
+									   TUTORIAL_FILTER_KEYTRIGGER,
+									   TUTORIAL_FILTER_TYPETRIGGER,
+									   0);
+
+	sPSActionControl->StringIDToTypeID(TUTORIAL_FILTER_UUID,
+									   &workFilterEventID);
+
+	sPSActionControl->Play(&result,
+						   workFilterEventID,
+						   descriptor.get(),
+						   plugInDialogSilent);
+
+	if (result.get() != NULL) {
+		sPSActionDescriptor->GetEnumerated(result.get(),
+										   TUTORIAL_FILTER_KEYRESULT,
+										   &workFilterTypeID,
+										   &workFilterEnumID);
+	} else {
+		BOOL status = EnumWindows(getPSMainWindowCB, (LPARAM)NULL);
+		assert(status != 0);
+		MessageBoxA(globalPSMainWindowHwnd, "Error occurred!", "Error", MB_OK|MB_ICONERROR);
+
+		return stat;
+	}
+
+	return stat;
+}
+~~~~~~
+
+This is the actual meat right here; you can see why now we share the header
+files between the two plug-ins: we need to give access to the Automation plug-in
+to call the UUID of the filter plug-in through the actions suite. Additional IDs
+can be passed into the filter plug-in as well, in order to read/write data and
+communicate between the two plug-ins (for example, if you wanted a
+Plain-Old-Data (POD) result from the filter once it had finished
+executing). We'll not be making use of that here in this example.
+
+Compile, deploy, run Photoshop, and you should be able to see the Automation plug-in show
+up in your Automation menu in the main menu, while the Filter plug-in should
+have disappeared from the Filter menu. You should then be able to run the
+Automation plug-in and have it generate the JPGs like before instead!
+
 
 # Recipe: Communicating between CEP panels and C++ plug-ins #
+
+The last recipe I'll be focusing on today involves a tiny bit of JavaScript/JSX
+(which is necessary when creating CEP panels). I will _not_ be going over how to
+create CEP panels, so please refer to the source code example in the repository
+if you need guidance.
 
 ## What is CSXS? ##
 
