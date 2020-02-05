@@ -1,5 +1,5 @@
 #include "PIDefines.h"
-#include "tutorial_automation_globals.h"
+#include "tutorial_csxs_cep_communication_globals.h"
 
 #ifdef __PIMac__
 	#include "PIGeneral.r"
@@ -14,15 +14,15 @@
 #include "PIActions.h"
 
 // Listener resource ID is 18500 from the SDK
-resource 'PiPL' ( TUTORIAL_AUTOMATION_RESOURCE_ID, TUTORIAL_AUTOMATION_PLUGINNAME, purgeable)
+resource 'PiPL' ( TUTORIAL_CSXS_CEP_COMMUNICATION_RESOURCE_ID, TUTORIAL_CSXS_CEP_COMMUNICATION_PLUGINNAME, purgeable)
 	{
 		{
 		Kind { Actions },
-		Name { TUTORIAL_AUTOMATION_PLUGINNAME },
+		Name { TUTORIAL_CSXS_CEP_COMMUNICATION_PLUGINNAME },
 		Category { "AdobeSDK" },
 		Version { (latestActionsPlugInVersion << 16) | latestActionsPlugInSubVersion },
 
-		Component { ComponentNumber, TUTORIAL_AUTOMATION_PLUGINNAME },
+		Component { ComponentNumber, TUTORIAL_CSXS_CEP_COMMUNICATION_PLUGINNAME },
 
 		#ifdef __PIMac__
 			CodeMacIntel64 { "AutoPluginMain" },
@@ -40,31 +40,44 @@ resource 'PiPL' ( TUTORIAL_AUTOMATION_RESOURCE_ID, TUTORIAL_AUTOMATION_PLUGINNAM
 
 		HasTerminology
 			{
-			TUTORIAL_AUTOMATION_CLASS_ID,
-			TUTORIAL_AUTOMATION_EVENT_ID,
-			TUTORIAL_AUTOMATION_RESOURCE_ID,
-			TUTORIAL_AUTOMATION_UUID
+			TUTORIAL_CSXS_CEP_COMMUNICATION_CLASS_ID,
+			TUTORIAL_CSXS_CEP_COMMUNICATION_EVENT_ID,
+			TUTORIAL_CSXS_CEP_COMMUNICATION_RESOURCE_ID,
+			TUTORIAL_CSXS_CEP_COMMUNICATION_UUID
 			},
+
+		// We include "Persistent" to keep the plug-in loaded until
+		// until Photoshop quits.
+		Persistent{},
+
+		// Only relevant if Persistent is set.
+		Messages
+		{
+			startupRequired,
+			doesNotPurgeCache,
+			shutdownRequired,
+			acceptProperty
+		},
 		}
 	};
 
 //-------------------------------------------------------------------------------
 //	Dictionary (scripting) resource
 //-------------------------------------------------------------------------------
-resource 'aete' (TUTORIAL_AUTOMATION_RESOURCE_ID, TUTORIAL_AUTOMATION_PLUGINNAME " dictionary", purgeable)
+resource 'aete' (TUTORIAL_CSXS_CEP_COMMUNICATION_RESOURCE_ID, TUTORIAL_CSXS_CEP_COMMUNICATION_PLUGINNAME " dictionary", purgeable)
 	{
 	1, 0, english, roman,					/* aete version and language specifiers */
 		{
-		TUTORIAL_AUTOMATION_VENDORNAME,							/* vendor suite name */
-		TUTORIAL_AUTOMATION_PLUGINDESC,		/* optional description */
-		TUTORIAL_AUTOMATION_SUITE_ID,	/* suite ID */
+		TUTORIAL_CSXS_CEP_COMMUNICATION_VENDORNAME,							/* vendor suite name */
+		TUTORIAL_CSXS_CEP_COMMUNICATION_PLUGINDESC,		/* optional description */
+		TUTORIAL_CSXS_CEP_COMMUNICATION_SUITE_ID,	/* suite ID */
 		1,									/* suite code, must be 1 */
 		1,									/* suite level, must be 1 */
 			{								/* structure for automation */
-			TUTORIAL_AUTOMATION_PLUGINNAME,		/* name */
-			TUTORIAL_AUTOMATION_PLUGINDESC,		/* optional description */
-			TUTORIAL_AUTOMATION_CLASS_ID,		/* class ID, must be unique or Suite ID */
-			TUTORIAL_AUTOMATION_EVENT_ID,		/* event ID, must be unique */
+			TUTORIAL_CSXS_CEP_COMMUNICATION_PLUGINNAME,		/* name */
+			TUTORIAL_CSXS_CEP_COMMUNICATION_PLUGINDESC,		/* optional description */
+			TUTORIAL_CSXS_CEP_COMMUNICATION_CLASS_ID,		/* class ID, must be unique or Suite ID */
+			TUTORIAL_CSXS_CEP_COMMUNICATION_EVENT_ID,		/* event ID, must be unique */
 
 			NO_REPLY,						/* never a reply */
 			IMAGE_DIRECT_PARAMETER,			/* direct parameter, used by Photoshop */

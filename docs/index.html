@@ -2965,15 +2965,141 @@ Automation plug-in and have it generate the JPGs like before instead!
 The last recipe I'll be focusing on today involves a tiny bit of JavaScript/JSX
 (which is necessary when creating CEP panels). I will _not_ be going over how to
 create CEP panels, so please refer to the source code example in the repository
-if you need guidance.
+if you need guidance. You can also refer to the
+[CEP documentation](https://github.com/Adobe-CEP/Getting-Started-guides),
+which is _much_ better documented than the C++ SDK.
 
-## What is CSXS? ##
+This recipe will show you how to trigger an Automation plug-in (which you can
+extend to anything, as we've seen from our previous example) from a CEP
+panel. You might find this useful, for example, if you needed functionality from
+the CEP suite (or vice versa), or if you needed your UI to have native "look and
+feel" of the Photoshop interface (or dockable).
+
+
+## Additonal requirements ##
+
+Before we begin, you'll need to download the
+[Adobe Illustrator SDK](https://console.adobe.io/downloads)
+as well from Adobe's website. We'll be modifying copies of the `SDKPlugPlug.h` and
+`SDKPlugPlug.cpp` sources within the SDK; these are not available in the
+Photoshop SDK itself. These sources normally live at `samplecode\common\source`
+and `samplecode\common\includes` in the Illustrator SDK. Make copies of these
+two files and place them in your current project's sources.
+
+!!! note What is CSXS?
+    CSXS, or the Adobe **Creative Suites Extended Services**, is the name given
+    to the set of functionalities that Adobe exposes to allow different Creative
+    Suite products (Photoshop, Premiere Pro, Illustrator, After Effects etc.) to
+    communicate with each other. CEP is the intended successor of this moniker,
+    but for both historical and practical reasons (CEP does not encompass all
+    previous functionality), you'll find the legacy moniker scattered around the
+    codebase as you look around Photoshop's SDK.
+
+I also won't bother with signing the extension in this recipe (since we already
+covered how to do that in Section Package signing), so make sure that you [follow
+the instructions](https://github.com/Adobe-CEP/Getting-Started-guides/blob/master/Client-side%20Debugging/readme.md#set-the-debug-mode)
+for how to enable running unsigned extensions within Photoshop on your development machine.
+
 
 ## A sample CEP panel ##
 
-## Writing the C++ native plug-in ##
+As stated, I'm going to skip how to create a panel. If you're familiar with how
+to create UI in a declarative-style manner, you'll grok this in no time if you
+take a look at the actual CEP documentation.  Besides, as you will see, it's
+really just HTML markup:
+
+~~~~~~html
+<!doctype html>
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="css/ui.css">
+  </head>
+
+  <body>
+    <div>
+      <h4>Export layers</h4>
+
+      <p ">Exports layers from the current document.</p>
+
+      <button id="btnAccept">Extract</button>
+      <button id="btnClose">Close</button>
+
+    </div>
+
+  </body>
+
+  <script src="js/CSInterface.js"></script>
+  <script src="js/main.js"></script>
+</html>
+~~~~~~
+
+!!! note Where can I get `CSInterface.js`?
+    Again, this is available as part of the Adobe CEP SDK.
+
+The CSS used is available in the repository, but could easily just be omitted as
+well, since it's just for styling purposes. The logic driving the UI is also
+dirt-simple as well:
+
+~~~~~~javascript
+var globalCSInterface = new CSInterface();
+var extensionRootDirPath = globalCSInterface.getSystemPath(SystemPath.EXTENSION);
+
+
+function ExportLayersCB() {
+    globalCSInterface.evalScript("ESPSExportLayers();");
+
+    return;
+}
+
+
+function ClosePanelCB() {
+    globalCSInterface.closeExtension();
+
+    return;
+}
+
+
+btnAccept.onclick = ExportLayersCB;
+btnClose.onclick = ClosePanelCB;
+
+globalCSInterface.evalScript("ESPSActivateAutomationPlugin();");
+~~~~~
+
+Yes, it's JavaScript, or rather, a specific dialect of JavaScript that Adobe
+calls **ExtendScript**. It's used for scripting in Adobe products (well, apart
+from Flash, but that's dead) and is generally the "supported" route when it
+comes to extending Photoshop these days.
+
+You can see that we're basically hooking up the buttons to fire off JavaScript
+functions, which make use of the `CSInterface` singleton that we acquire in the
+beginning. The **Close** button will, as the name implies, close the panel. The
+other button, however, will run something called `ESPSExportLayers()`, while
+there's something at the end of the script that calls
+`ESPSActivateAutomationPlugin()`.
+
+`ESPSExportLayers` looks like this:
+
+~~~~~~javascript
+~~~~~~
+
 
 ## `SDKPlugPlug` to the rescue ##
+
+Now, in order to actually make use of the CSXS functionality, we're going to
+need to modify the source files from the Adobe Illustrator SDK in order for them
+to work in Photoshop.
+
+
+
+!!! note Why isn't this in the Photoshop SDK natively?
+    Your guess is as good as mine. But according to Tom Ruark of Adobe:
+
+    _"Using those files in a Photoshop plugin and Photoshop as the host is
+    perfectly fine. I never added them to the Photoshop SDK as I never had an
+    official plugin to exercise them with. The CEP SDK was a separate thing
+    and I didn't want to tie them together."_
+
+    So there you have it. The reason is...the lack of example documentation?
 
 ## CEP to C++ ##
 
@@ -3003,7 +3129,7 @@ If you see any errors or have any questions about this tutorial, feel free to
 
 * [Morgan Mcguire](https://casual-effects.com/markdeep/), for the Markdeep format.
 
-* Aras Pranckevicius, for writing the Markdeep theme used in this tutorial.
+* Aras Pranckevicius, for writing the original Markdeep theme used in this tutorial.
 
 <style class="fallback">body{visibility:hidden}</style><script>markdeepOptions={tocStyle:'medium'};</script>
 <!-- Markdeep: --><script src="https://casual-effects.com/markdeep/latest/markdeep.min.js?" charset="utf-8"></script>
