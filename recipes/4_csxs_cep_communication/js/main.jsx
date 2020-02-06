@@ -6,7 +6,8 @@
 var globalPSApp = app; // type: Application
 
 
-var EXPORT_LAYERS_CSXS_EVENT_ID = "com.examples.exportlayers.exportlayers";
+var EXPORT_LAYERS_CSXS_EVENT_ID = "com.examples.exportlayers.exportlayersevent";
+var TUTORAL_CSXS_CEP_COMMUNICATION_UUID = "8a166f73-7984-4f69-a5d3-bb02d981adea";
 
 
 function ESPSExportLayers() {
@@ -15,25 +16,22 @@ function ESPSExportLayers() {
         var xLib = new ExternalObject("lib:\PlugPlugExternalObject");
     } catch (e) {
         alert(e);
-
         return;
     }
 
     if (xLib) {
         var eventObj = new CSXSEvent();
         eventObj.type = EXPORT_LAYERS_CSXS_EVENT_ID;
-        eventObj.data = filename;
+        eventObj.data = true;
         eventObj.dispatch();
-
         return;
     }
-
     return;
 }
 
 
 function ESPSActivateAutomationPlugin() {
-    var idPlugin = stringIDToTypeID("CSXSCEPCommunicationTutorial");
+    var idPlugin = stringIDToTypeID(TUTORAL_CSXS_CEP_COMMUNICATION_UUID);
     executeAction(idPlugin, undefined, DialogModes.NO);
 
     return;

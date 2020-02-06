@@ -2973,7 +2973,46 @@ This recipe will show you how to trigger an Automation plug-in (which you can
 extend to anything, as we've seen from our previous example) from a CEP
 panel. You might find this useful, for example, if you needed functionality from
 the CEP suite (or vice versa), or if you needed your UI to have native "look and
-feel" of the Photoshop interface (or dockable).
+feel" of the Photoshop interface (or dockable**.
+
+How this is going to work, in a diagram:
+
+*************************************************************************************
+*                                                     +----------------------+      *
+*                                                     |                      |      *
+*                                                     |    CEP Panel (HTML)  |      *
+*                                                     |                      |      *
+*                                                     +-------------+--------+      *
+*                                                                   |               *
+*                                                                   |               *
+*                                                                   |               *
+*                                                          +--------v---------+     *
+*                                                          |   JavaScript     |     *
+*                                                          |      (.js)       |     *
+* +---------------------+                                  |                  |     *
+* |                     |                                  +---------+--------+     *
+* |  AutomationPlugin   |                                            |              *
+* |     (.8li dll)      |                                            |              *
+* +-------^-------------+                                            |              *
+*         |                                                          |              *
+*         |                +--------------------+             +------v-----------+  *
+*         | subscribes     |                    |  dispatches |  Adobe           |  *
+*         +---------------->  PlugPlugOwl.dll   <-------------+  ExtendScript    |  *
+*           to events      |                    |   events    |      (.jsx)      |  *
+*                          +--------^-----------+             +------------------+  *
+*                                   |                                               *
+*                                   |                                               *
+*                                   |                                               *
+*                          +--------v---------------+                               *
+*                          |                        |                               *
+*                          |   CSXS event           |                               *
+*                          |   (metadata)           |                               *
+*                          +------------------------+                               *
+*************************************************************************************
+[Figure [diagram]: An overview of CSXS communication between the CEP panel and native plug-in.]
+
+It's also worth noting here that the JSX layer can _also_ subscribe to events;
+it doesn't need to be limited to just one-way traffic, as we will see later.
 
 
 ## Additonal requirements ##
@@ -3058,7 +3097,6 @@ function ClosePanelCB() {
     return;
 }
 
-
 btnAccept.onclick = ExportLayersCB;
 btnClose.onclick = ClosePanelCB;
 
@@ -3089,7 +3127,156 @@ Now, in order to actually make use of the CSXS functionality, we're going to
 need to modify the source files from the Adobe Illustrator SDK in order for them
 to work in Photoshop.
 
+First of all, if we take a look at `SDKPlugPlug.cpp`:
 
+~~~~~~cpp
+AIErr SDKPlugPlug::Load(AIFoldersSuite* sAIFolders)
+{
+	AIErr err = kNoErr;
+
+	do {
+
+#ifdef WIN_ENV
+		AIFolderType folderType = kAIApplicationFolderType;
+		ai::UnicodeString libName("PlugPlugOwl.dll");
+#else
+		AIFolderType folderType = kAIContentsFolderType;
+		ai::UnicodeString libName("/Frameworks/PlugPlugOwl.framework");
+#endif
+
+		ai::FilePath path;
+		err = sAIFolders->FindFolder(folderType, false, path);
+		if(err) { break; }
+
+
+		path.AddComponent(libName);
+		if(!path.Exists(false)) { err = kCantHappenErr; break; }
+
+#ifdef WIN_ENV
+		fhModule =  LoadLibraryW(path.GetFullPath().as_WCHARStr().as_LPCWSTR());
+		if(!fhModule) { err = kCantHappenErr; break; }
+
+		pFnLoadExtension = (PlugPlugLoadExtensionFn) GetProcAddress(fhModule, "PlugPlugLoadExtension");
+		if(!pFnLoadExtension) { err = kCantHappenErr; break; }
+
+		pFnUnloadExtension = (PlugPlugUnloadExtensionFn) GetProcAddress(fhModule, "PlugPlugUnloadExtension");
+		if(!pFnUnloadExtension) { err = kCantHappenErr; break; }
+
+		pFnAddEventListener = (PlugPlugAddEventListenerFn) GetProcAddress(fhModule, "PlugPlugAddEventListener");
+		if(!pFnAddEventListener) { err = kCantHappenErr; break; }
+
+		pFnRemoveEventListener = (PlugPlugRemoveEventListenerFn) GetProcAddress(fhModule, "PlugPlugRemoveEventListener");
+		if(!pFnRemoveEventListener) { err = kCantHappenErr; break; }
+
+		pFnDispatchEvent = (PlugPlugDispatchEventFn) GetProcAddress(fhModule, "PlugPlugDispatchEvent");
+		if(!pFnDispatchEvent) { err = kCantHappenErr; break; }
+
+// ... More code below
+~~~~~~
+
+This is pretty much what we're looking for. You can see that on Windows, the
+code looks for the presence of a DLL called `PlugPlugOwl.dll` (and the
+corresponding framework on OSX) and then attempts to find a couple of functions
+within it, functions that we will be making use of in our native C++ plugin to
+subscribe to events that we emit from our CEP panel. This DLL ships with
+Photoshop as well with all the same functionality of the Illustrator one, so we
+don't need to worry about that part, at least.
+
+However, in order to actually be able to use the functionality with Photoshop,
+we're going to have to modify this file and the header as well. Let's add these
+lines:
+
+~~~~~~cpp
+#ifdef WIN_ENV
+#include <windows.h>
+
+#define SDKPLUGPLUG_MAX_PATH MAX_PATH
+#define SDKPLUGPLUG_OWL_DLL_FILENAME "PlugPlugOwl.dll"
+
+#endif
+
+// ...
+
+
+#include <Windows.h>
+#include <string>
+#include <cassert>
+
+
+int getCurrentProcessFileName(char *filename, int size)
+{
+	DWORD resultDW = GetModuleFileNameA(NULL, (LPTSTR)filename, (DWORD)size);
+
+	int result = (int)resultDW;
+
+	return result;
+}
+
+
+std::string PSFindPlugPlugDLLFileName()
+{
+	char plugPlugOwlDLLFileName[SDKPLUGPLUG_MAX_PATH];
+	int processFilePathLength = getCurrentProcessFileName(plugPlugOwlDLLFileName, SDKPLUGPLUG_MAX_PATH);
+
+	assert(processFilePathLength > 0);
+
+	std::string result = std::string(plugPlugOwlDLLFileName);
+
+	size_t lastPathSepIdx = result.rfind("\\");
+	result.erase(lastPathSepIdx + 1);
+
+	result += SDKPLUGPLUG_OWL_DLL_FILENAME;
+
+	return result;
+}
+~~~~~~
+
+Nothing particularly fancy; we're basically just looking for a `PlugPlugOwl.dll`
+file based off the current Photoshop executable's directory, and then continue
+to load it into Photoshop. After that, we continue the same way by looking for
+the addresses of the symbols that we're interested in within the DLL.
+
+While we're at it, because we're actually making Photoshop plug-ins and not
+Illustrator ones, we also probably should change those `AIErr` return status
+codes to `SPErr` ones that we actually have available:
+
+~~~~~~cpp
+SPErr SDKPlugPlug::Load()
+{
+	SPErr err = kNoErr;
+
+	do {
+		// NOTE: (sonictk) Find the DLL location dynamically instead of having it hard-coded
+		// to a specific file path, since this can change depending on the Photoshop install location
+		// in various deployment systems.
+		std::string libName = PSFindPlugPlugDLLFileName();
+
+#ifdef WIN_ENV
+		fhModule =  LoadLibraryA(libName.c_str());
+		if(!fhModule) { err = kCantHappenErr; break; }
+
+		pFnLoadExtension = (PlugPlugLoadExtensionFn) GetProcAddress(fhModule, "PlugPlugLoadExtension");
+		if(!pFnLoadExtension) { err = kCantHappenErr; break; }
+
+		pFnUnloadExtension = (PlugPlugUnloadExtensionFn) GetProcAddress(fhModule, "PlugPlugUnloadExtension");
+		if(!pFnUnloadExtension) { err = kCantHappenErr; break; }
+
+		pFnAddEventListener = (PlugPlugAddEventListenerFn) GetProcAddress(fhModule, "PlugPlugAddEventListener");
+		if(!pFnAddEventListener) { err = kCantHappenErr; break; }
+
+		pFnRemoveEventListener = (PlugPlugRemoveEventListenerFn) GetProcAddress(fhModule, "PlugPlugRemoveEventListener");
+		if(!pFnRemoveEventListener) { err = kCantHappenErr; break; }
+
+		pFnDispatchEvent = (PlugPlugDispatchEventFn) GetProcAddress(fhModule, "PlugPlugDispatchEvent");
+		if(!pFnDispatchEvent) { err = kCantHappenErr; break; }
+#else
+
+// ... More code below
+~~~~~~
+
+If you need more help, or just want to use the final result, The full example is
+available in the `thirdparty/psapi/ai` folder in the accompanying
+[source repository](https://github.com/sonictk/ps_cpp_recipes).
 
 !!! note Why isn't this in the Photoshop SDK natively?
     Your guess is as good as mine. But according to Tom Ruark of Adobe:
@@ -3099,9 +3286,59 @@ to work in Photoshop.
     official plugin to exercise them with. The CEP SDK was a separate thing
     and I didn't want to tie them together."_
 
-    So there you have it. The reason is...the lack of example documentation?
+    So there you have it. The reason is...the lack of example documentation from
+    themselves? I'm honestly not sure what to make of it other than "we don't
+    have time."
 
 ## CEP to C++ ##
+
+So now that our native plug-in is ready to communicate, let's test it out. We'll
+go ahead and subscribe to an event of our choosing in the native plug-in:
+
+~~~~~~cpp
+#define EXPORT_LAYERS_CSXS_EVENT_ID "com.examples.exportlayers.exportlayers"
+
+static SDKPlugPlug *globalSDKPlugPlug = NULL;
+static bool globalEventListenerRegistered = false;
+
+
+void CSXSEventExportLayersCB(const csxs::event::Event *const event, void *const context)
+{
+	if (event->data == NULL) {
+		return;
+	}
+
+	BOOL status = EnumWindows(getPSMainWindowCB, (LPARAM)NULL);
+	assert(status != 0);
+	MessageBoxA(globalPSMainWindowHwnd, "Hello World from CEP!", "Tutorial Dialog", MB_OK|MB_ICONINFORMATION);
+
+	return;
+}
+
+
+if (!globalSDKPlugPlug) {
+	globalSDKPlugPlug = new SDKPlugPlug;
+	status = globalSDKPlugPlug->Load();
+	if (status != kSPNoError) {
+		delete globalSDKPlugPlug;
+		return status;
+	}
+}
+
+if (!globalEventListenerRegistered) {
+	csxs::event::EventErrorCode csxsStat;
+	csxsStat = globalSDKPlugPlug->AddEventListener(EXPORT_LAYERS_CSXS_EVENT_ID,
+												   CSXSEventExportLayersCB,
+												   NULL);
+	if (csxsStat != csxs::event::EventErrorCode::kEventErrorCode_Success) {
+		return kSPLogicError;
+	}
+
+	globalEventListenerRegistered = true;
+~~~~~~
+
+
+
 
 ## C++ to CEP ##
 

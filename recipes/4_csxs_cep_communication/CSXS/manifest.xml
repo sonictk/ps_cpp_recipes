@@ -14,9 +14,9 @@
 * written permission of Adobe.
 **************************************************************************/
 -->
-<ExtensionManifest ExtensionBundleId="com.examples.examplecsxspanel" ExtensionBundleName="ExampleCSXSPanel" ExtensionBundleVersion="1.0" Version="4.0">
+<ExtensionManifest ExtensionBundleId="com.examples.exportlayers.exportlayers" ExtensionBundleName="ExampleCSXSPanel" ExtensionBundleVersion="1.0" Version="4.0">
   <ExtensionList>
-    <Extension Id="com.examples.examplecsxspanel.extension" Version="1.0"/>
+    <Extension Id="com.examples.exportlayers.exportlayers" Version="1.0"/>
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
@@ -30,7 +30,7 @@
     </RequiredRuntimeList>
   </ExecutionEnvironment>
   <DispatchInfoList>
-    <Extension Id="com.examples.examplecsxspanel.extension">
+    <Extension Id="com.examples.exportlayers.exportlayers">
       <DispatchInfo>
         <Resources>
           <MainPath>./html/index.html</MainPath>
@@ -53,6 +53,10 @@
               <Width>280</Width>
             </MinSize>
           </Geometry>
+          <Icons>
+            <Icon Type="Normal">./resources/icon.png</Icon>
+            <Icon Type="RollOver">./resources/icon.png</Icon>
+          </Icons>
         </UI>
       </DispatchInfo>
     </Extension>

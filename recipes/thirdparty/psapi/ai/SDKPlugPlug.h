@@ -26,21 +26,7 @@
 #define SDKPLUGPLUG_MAX_PATH MAX_PATH
 #define SDKPLUGPLUG_OWL_DLL_FILENAME "PlugPlugOwl.dll"
 
-#else
-
 #endif
-
-
-// #ifndef PS_PLUGPLUGOWL_DLL_LOCATION
-// #ifdef _WIN32
-// #define PS_PLUGPLUGOWL_DLL_LOCATION "C:/Program Files/Adobe/Adobe Photoshop CC 2019/PlugPlugOwl.dll"
-// #elif __APPLE__
-// #define PS_PLUGPLUGOWL_DLL_LOCATION "/Frameworks/PlugPlugOwl.framework"
-// #else
-// #error "Unsupported platform for compilation."
-// #endif // OS layer
-// #endif // PS_PLUGPLUGOWL_DLL_LOCATION
-
 
 
 //-----------------------------------------------------------------------------

@@ -45,10 +45,6 @@ BOOL CALLBACK getPSMainWindowCB(HWND hwnd, LPARAM lParam)
 
 void CSXSEventExportLayersCB(const csxs::event::Event *const event, void *const context)
 {
-	if (event->data == NULL) {
-		return;
-	}
-
 	BOOL status = EnumWindows(getPSMainWindowCB, (LPARAM)NULL);
 	assert(status != 0);
 	MessageBoxA(globalPSMainWindowHwnd, "Hello World from CEP!", "Tutorial Dialog", MB_OK|MB_ICONINFORMATION);

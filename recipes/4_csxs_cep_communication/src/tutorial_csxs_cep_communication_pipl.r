@@ -34,10 +34,6 @@ resource 'PiPL' ( TUTORIAL_CSXS_CEP_COMMUNICATION_RESOURCE_ID, TUTORIAL_CSXS_CEP
 			#endif
 		#endif
 
-		// This has the side effect of disabling the plugin in the UI until a document is
-		// actually open. Perfect.
-		EnableInfo { "true" },
-
 		HasTerminology
 			{
 			TUTORIAL_CSXS_CEP_COMMUNICATION_CLASS_ID,
