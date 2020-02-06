@@ -49,6 +49,16 @@ void CSXSEventExportLayersCB(const csxs::event::Event *const event, void *const 
 	assert(status != 0);
 	MessageBoxA(globalPSMainWindowHwnd, "Hello World from CEP!", "Tutorial Dialog", MB_OK|MB_ICONINFORMATION);
 
+	// Send a message back to the CEP Panel.
+	csxs::event::Event pluginDoneEvent;
+	pluginDoneEvent.type = DONE_CSXS_EVENT_ID;
+	pluginDoneEvent.scope = csxs::event::kEventScope_Application;
+	pluginDoneEvent.appId = CSXS_PHOTOSHOP_APPID;
+	pluginDoneEvent.extensionId = TUTORIAL_CSXS_CEP_COMMUNICATION_PLUGINNAME;
+	pluginDoneEvent.data = "Hello back from C++!";
+
+	globalSDKPlugPlug->DispatchEvent(&pluginDoneEvent);
+
 	return;
 }
 

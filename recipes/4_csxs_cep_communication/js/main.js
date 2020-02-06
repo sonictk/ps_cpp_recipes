@@ -4,6 +4,23 @@
  */
 var globalCSInterface = new CSInterface();
 
+var DONE_CSXS_EVENT_ID = "com.examples.exportlayers.doneevent";
+
+
+// Listen for events from the C++ plug-in.
+globalCSInterface.addEventListener(DONE_CSXS_EVENT_ID,
+                                   function(event) {
+                                       AlertDialog(event.data);
+                                       return;
+                                   });
+
+
+function AlertDialog(msg) {
+    globalCSInterface.evalScript("alert(\"" + msg + "\");");
+
+    return;
+}
+
 
 function ExportLayersCB() {
     globalCSInterface.evalScript("ESPSExportLayers();");

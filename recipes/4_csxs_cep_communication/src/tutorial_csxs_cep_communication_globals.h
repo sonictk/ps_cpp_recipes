@@ -11,6 +11,7 @@
 #define TUTORIAL_CSXS_CEP_COMMUNICATION_EVENT_ID 'ExAm'
 #define TUTORIAL_CSXS_CEP_COMMUNICATION_VENDORNAME "memyselfandi"
 #define EXPORT_LAYERS_CSXS_EVENT_ID "com.examples.exportlayers.exportlayersevent"
+#define DONE_CSXS_EVENT_ID "com.examples.exportlayers.doneevent"
 
 
 #endif

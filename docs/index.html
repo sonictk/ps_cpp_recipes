@@ -3118,6 +3118,24 @@ there's something at the end of the script that calls
 `ESPSExportLayers` looks like this:
 
 ~~~~~~javascript
+function ESPSExportLayers() {
+    // The library might not exist in some Photoshop versions.
+    try {
+        var xLib = new ExternalObject("lib:\PlugPlugExternalObject");
+    } catch (e) {
+        alert(e);
+        return;
+    }
+
+    if (xLib) {
+        var eventObj = new CSXSEvent();
+        eventObj.type = EXPORT_LAYERS_CSXS_EVENT_ID;
+        eventObj.data = true;
+        eventObj.dispatch();
+        return;
+    }
+    return;
+}
 ~~~~~~
 
 
@@ -3337,10 +3355,54 @@ if (!globalEventListenerRegistered) {
 	globalEventListenerRegistered = true;
 ~~~~~~
 
-
-
+Now, go ahead and open the panel in Photoshop, and click on the button. You
+should get your dialog pop up back. Congratulations, you've now executed C++
+code from your CEP panel?
 
 ## C++ to CEP ##
+
+Of course, if you needed to trigger events in your CEP panel from C++ (such as
+updating a progress bar, logging, changing UI elements etc.), you can use the
+CSXS mechanism to do this as well. Simply dispatch the event from C++:
+
+~~~~~~cpp
+#define DONE_CSXS_EVENT_ID "com.examples.exportlayers.doneevent"
+
+
+csxs::event::Event pluginDoneEvent;
+pluginDoneEvent.type = DONE_CSXS_EVENT_ID;
+pluginDoneEvent.scope = csxs::event::kEventScope_Application;
+pluginDoneEvent.appId = CSXS_PHOTOSHOP_APPID;
+pluginDoneEvent.extensionId = TUTORIAL_CSXS_CEP_COMMUNICATION_PLUGINNAME;
+pluginDoneEvent.data = "Hello back from C++!";
+
+globalSDKPlugPlug->DispatchEvent(&pluginDoneEvent);
+~~~~~~
+
+And in your JavaScript layer, subscribe to that event:
+
+~~~~~~javascript
+var DONE_CSXS_EVENT_ID = "com.examples.exportlayers.doneevent";
+
+globalCSInterface.addEventListener(DONE_CSXS_EVENT_ID,
+                                   function(event) {
+                                       AlertDialog(event.data);
+                                       return;
+                                   });
+
+function AlertDialog(msg) {
+    globalCSInterface.evalScript("alert(\"" + msg + "\");");
+
+    return;
+}
+~~~~~~
+
+Now, once you run your native plug-in to the point where the event is
+dispatched, you should see Photoshop launch a dialog with your text back from
+the native plug-in.
+
+Again, if you need additional help or have trouble grokking this, the full
+source code for both the panel and the native plug-in are available in the [repository](https://github.com/sonictk/ps_cpp_recipes).
 
 
 # Closing thoughts #
