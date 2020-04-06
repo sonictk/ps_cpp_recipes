@@ -12,6 +12,8 @@
 #include "libps_math.cpp"
 #include "libps_pixel.cpp"
 
+#include "tutorial_imgui_gui.cpp"
+
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_MSC_SECURE_CRT
 #define STB_IMAGE_WRITE_IMPLEMENTATION

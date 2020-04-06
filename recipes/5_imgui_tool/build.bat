@@ -37,7 +37,7 @@ set DebugLinkerFlags=%CommonLinkerFlags% /opt:noref /debug
 set ReleaseLinkerFlags=%CommonLinkerFlags% /opt:ref
 set RelWithDebInfoLinkerFlags=%CommonLinkerFlags% /opt:ref /debug
 
-set FilterCommonLinkerFlags=/dll /incremental:no /machine:x64 /nologo /defaultlib:Kernel32.lib /defaultlib:Shlwapi.lib /defaultlib:User32.lib /defaultlib:Shell32.lib /defaultlib:Ole32.lib /defaultlib:Comctl32.lib /nodefaultlib:LIBCMTD.lib /nodefaultlib:LIBCMT.lib
+set FilterCommonLinkerFlags=/dll /incremental:no /machine:x64 /nologo /defaultlib:d3d11.lib /defaultlib:dxgi.lib /defaultlib:Kernel32.lib /defaultlib:Shlwapi.lib /defaultlib:User32.lib /defaultlib:Shell32.lib /defaultlib:Ole32.lib /defaultlib:Comctl32.lib /nodefaultlib:LIBCMTD.lib /nodefaultlib:LIBCMT.lib
 set FilterDebugLinkerFlags=%FilterCommonLinkerFlags% /opt:noref /debug /pdb:"%BuildDir%\%ProjectName%_filter.pdb" "%FilterResourceRES%"
 set FilterReleaseLinkerFlags=%FilterCommonLinkerFlags% /opt:ref "%FilterResourceRES%"
 set FilterRelWithDebInfoLinkerFlags=%FilterCommonLinkerFlags% /opt:ref /debug /pdb:"%BuildDir%\%FilterProjectName%.pdb" "%FilterResourceRES%"
