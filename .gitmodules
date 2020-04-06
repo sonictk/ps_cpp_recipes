@@ -1,0 +1,6 @@
+[submodule "recipes/thirdparty/imgui"]
+	path = recipes/thirdparty/imgui
+	url = git@github.com:ocornut/imgui.git
+[submodule "recipes/thirdparty/Nuklear"]
+	path = recipes/thirdparty/Nuklear
+	url = git@github.com:Immediate-Mode-UI/Nuklear.git

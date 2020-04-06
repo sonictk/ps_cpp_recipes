@@ -1,4 +1,4 @@
-#include "tutorial_globals.h"
+#include "tutorial_imgui_globals.h"
 
 #include <SPBasic.h>
 #include <SPInterf.h>
@@ -45,15 +45,15 @@ SPErr ExecuteCB(void *params)
 	Auto_Desc result(false);
 
 	DescriptorTypeID workFilterEventID;
-	DescriptorEnumID workFilterEnumID = TUTORIAL_FILTER_ENUMINFO;
+	DescriptorEnumID workFilterEnumID = TUTORIAL_IMGUI_FILTER_ENUMINFO;
 	DescriptorEnumTypeID workFilterTypeID;
 
 	sPSActionDescriptor->PutEnumerated(descriptor.get(),
-									   TUTORIAL_FILTER_KEYTRIGGER,
-									   TUTORIAL_FILTER_TYPETRIGGER,
+									   TUTORIAL_IMGUI_FILTER_KEYTRIGGER,
+									   TUTORIAL_IMGUI_FILTER_TYPETRIGGER,
 									   0);
 
-	sPSActionControl->StringIDToTypeID(TUTORIAL_FILTER_UUID,
+	sPSActionControl->StringIDToTypeID(TUTORIAL_IMGUI_FILTER_UUID,
 									   &workFilterEventID);
 
 	sPSActionControl->Play(&result,
@@ -63,7 +63,7 @@ SPErr ExecuteCB(void *params)
 
 	if (result.get() != NULL) {
 		sPSActionDescriptor->GetEnumerated(result.get(),
-										   TUTORIAL_FILTER_KEYRESULT,
+										   TUTORIAL_IMGUI_FILTER_KEYRESULT,
 										   &workFilterTypeID,
 										   &workFilterEnumID);
 	} else {
