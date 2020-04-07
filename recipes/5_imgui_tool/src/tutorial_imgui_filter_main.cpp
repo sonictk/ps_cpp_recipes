@@ -1,3 +1,6 @@
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <Windows.h>
 #include <stdio.h>
 
@@ -9,6 +12,7 @@
 #include <PIUSuites.cpp>
 
 #include "libps_globals.h"
+#include "libps_platform.cpp"
 #include "libps_math.cpp"
 #include "libps_pixel.cpp"
 
@@ -200,6 +204,9 @@ void executeFilter(const FilterRecordPtr &filterRecord)
 		return;
 	}
 
+	GUIResult uiResult;
+	displayFilterGUIWithResult(getPSMainWindow(), &uiResult);
+
 	// NOTE: (sonictk) Create a temporary directory to store the output images.
 	char *tempDirPath = (char *)malloc(MAX_PATH * sizeof(char));
 	DWORD lenTempDirPath = GetTempPathA((DWORD)MAX_PATH, (LPSTR)tempDirPath);
@@ -225,7 +232,7 @@ void executeFilter(const FilterRecordPtr &filterRecord)
 
 		// NOTE: (sonictk) Format the final output path for this layer.
 		char outPath[MAX_PATH];
-		int lenPath = snprintf(outPath, 0, "%s%c%s.jpg", tempDirPath, OS_PATH_SEP, layerName);
+		int lenPath = snprintf(NULL, 0, "%s%c%s.jpg", tempDirPath, OS_PATH_SEP, layerName);
 		snprintf(outPath, lenPath + 1, "%s%c%s.jpg", tempDirPath, OS_PATH_SEP, layerName);
 
 		// NOTE: (sonictk) Read image pixels and write the output jpg.

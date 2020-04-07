@@ -1,3 +1,6 @@
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <Windows.h>
 #include <stdio.h>
 
@@ -223,7 +226,7 @@ void executeFilter(const FilterRecordPtr &filterRecord)
 
 		// NOTE: (sonictk) Format the final output path for this layer.
 		char outPath[MAX_PATH];
-		int lenPath = snprintf(outPath, 0, "%s%c%s.jpg", tempDirPath, OS_PATH_SEP, layerName);
+		int lenPath = snprintf(NULL, 0, "%s%c%s.jpg", tempDirPath, OS_PATH_SEP, layerName);
 		snprintf(outPath, lenPath + 1, "%s%c%s.jpg", tempDirPath, OS_PATH_SEP, layerName);
 
 		// NOTE: (sonictk) Read image pixels and write the output jpg.

@@ -10,4 +10,6 @@
 
 #define PS_NUM_OF_BITS_IN_ONE_BYTE 8
 
+#define MSG_UNSUPPORTED_PLATFORM "Unsupported platform for compilation."
+
 #endif /* LIBPS_GLOBALS_H */
