@@ -200,19 +200,30 @@ void executeFilter(const FilterRecordPtr &filterRecord)
 	}
 
 	ReadLayerDesc *layerDesc = docInfo->layersDescriptor;
-	if (layerDesc == NULL) {
+	ReadChannelDesc *pRChn = layerDesc->compositeChannelsList;
+	if (layerDesc == NULL || pRChn == NULL) {
 		return;
 	}
 
 	GUIResult uiResult;
+	uiResult.exportPath = (char *)malloc(PS_MAX_PATH * sizeof(char));
+	GetTempPathA((DWORD)MAX_PATH, (LPSTR)uiResult.exportPath);
+
+	// NOTE: (sonictk) We need to predict the initial width/height of the document to export.
+	uiResult.width = pRChn->bounds.right - pRChn->bounds.left;
+	uiResult.height = pRChn->bounds.bottom - pRChn->bounds.top;
+	uiResult.jpgQuality = 100;
+	uiResult.accepted = false;
 	displayFilterGUIWithResult(getPSMainWindow(), &uiResult);
 
-	// NOTE: (sonictk) Create a temporary directory to store the output images.
-	char *tempDirPath = (char *)malloc(MAX_PATH * sizeof(char));
-	DWORD lenTempDirPath = GetTempPathA((DWORD)MAX_PATH, (LPSTR)tempDirPath);
-	DWORD fileAttrs = GetFileAttributes((LPCTSTR)tempDirPath);
-	if (!(fileAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
-		CreateDirectory((LPCSTR)tempDirPath, NULL);
+	if (uiResult.accepted != GUI_ACCEPT) {
+		free(uiResult.exportPath);
+		return;
+	}
+
+	DWORD fileAttrs = GetFileAttributes((LPCTSTR)uiResult.exportPath);
+	if (fileAttrs == INVALID_FILE_ATTRIBUTES || !(fileAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
+		CreateDirectory((LPCSTR)uiResult.exportPath, NULL);
 	}
 
 	int layersLeftToProcess = docInfo->layerCount;
@@ -231,9 +242,9 @@ void executeFilter(const FilterRecordPtr &filterRecord)
 		}
 
 		// NOTE: (sonictk) Format the final output path for this layer.
-		char outPath[MAX_PATH];
-		int lenPath = snprintf(NULL, 0, "%s%c%s.jpg", tempDirPath, OS_PATH_SEP, layerName);
-		snprintf(outPath, lenPath + 1, "%s%c%s.jpg", tempDirPath, OS_PATH_SEP, layerName);
+		char outPath[PS_MAX_PATH];
+		int lenPath = snprintf(NULL, 0, "%s%c%s.jpg", uiResult.exportPath, OS_PATH_SEP, layerName);
+		snprintf(outPath, lenPath + 1, "%s%c%s.jpg", uiResult.exportPath, OS_PATH_SEP, layerName);
 
 		// NOTE: (sonictk) Read image pixels and write the output jpg.
 		ReadChannelDesc *rChn = NULL;
@@ -259,7 +270,7 @@ void executeFilter(const FilterRecordPtr &filterRecord)
 		}
 	} while (layersLeftToProcess > 0 && layerDesc != NULL);
 
-	free(tempDirPath);
+	free(uiResult.exportPath);
 
 	return;
 }

@@ -231,10 +231,27 @@ void displayFilterGUIWithResult(HWND parentPSWindow, GUIResult *uiResult)
 		{
 			ImGui::SetNextWindowSize(gImGuiWndSize, ImGuiCond_Always);
 
-			static const ImGuiWindowFlags imGuiWndFlags = ImGuiWindowFlags_AlwaysAutoResize;
+			static const ImGuiWindowFlags imGuiWndFlags = ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoCollapse;
 
 			if (shouldShowWindow) {
 				ImGui::Begin("Export Options", NULL, imGuiWndFlags);
+
+				// TODO: (sonictk) Implement exporter options that feed back to the filter.
+				ImGui::InputInt("Width", &(uiResult->width), 1, INT_MAX);
+				ImGui::InputInt("Height", &(uiResult->height), 1, INT_MAX);
+				ImGui::SliderInt("Quality", &(uiResult->jpgQuality), 1, 100);
+				ImGui::InputText("Export directory", uiResult->exportPath, PS_MAX_PATH);
+
+				ImGui::SetItemDefaultFocus();
+				if (ImGui::Button("Ok")) {
+					uiResult->accepted = GUI_ACCEPT;
+					shouldShowWindow = false;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) {
+					uiResult->accepted = GUI_REJECT;
+					shouldShowWindow = false;
+				}
 
 				ImGui::End();
 			}

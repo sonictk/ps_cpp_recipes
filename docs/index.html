@@ -22,6 +22,10 @@ the following topics:
 * Communicating between a traditional CEP panel in Photoshop and a native C++
   plugin using Adobe native CSXS events;
 
+* Creating your own GUIs directly without going through CEP. In this tutorial,
+  I'll be focusing on using Dear ImGui (https://github.com/ocornut/imgui) since
+  it's quickly becoming the most ubiquitous UI framework out available for use.
+
 Some of these recipes are already in the samples included in the SDK, but
 they're pretty obtuse and not necessarily implemented in an easy-to-understand
 manner (at least, it took me a while to grok them). Hopefully the recipes here
@@ -3405,6 +3409,22 @@ Again, if you need additional help or have trouble grokking this, the full
 source code for both the panel and the native plug-in are available in the [repository](https://github.com/sonictk/ps_cpp_recipes).
 
 
+# Recipe: Custom UI for plug-ins using ImGui #
+
+I decided to add one more recipe here since this is something that I've seen
+some people express interest in learning more about, and I haven't seen any
+other company attempt this yet in their Photoshop tooling (if any exists in the
+first place at all to begin with). If you're a seasoned Photoshop user, you're
+no doubt aware that certain filter plug-ins have their own UIs to allow you to
+tweak settings, sometimes even with an interactive document preview, before
+applying the filter to the image pixels themselves (the Liquify filter is an
+example of this).
+
+Here, I'm going to show you how to incorporate a UI for your own filter plugins,
+albeit a fairly simplistic one using [ImGui](https://github.com/ocornut/imgui).
+
+## Additional Requirements ##
+
 # Closing thoughts #
 
 It's been a pretty long road to get to the end, but hopefully by now you should
@@ -3429,6 +3449,8 @@ If you see any errors or have any questions about this tutorial, feel free to
 * [Morgan Mcguire](https://casual-effects.com/markdeep/), for the Markdeep format.
 
 * Aras Pranckevicius, for writing the original Markdeep theme used in this tutorial.
+
+* Omar Cornut, for writing Dear ImGui.
 
 <style class="fallback">body{visibility:hidden}</style><script>markdeepOptions={tocStyle:'medium'};</script>
 <!-- Markdeep: --><script src="https://casual-effects.com/markdeep/latest/markdeep.min.js?" charset="utf-8"></script>
