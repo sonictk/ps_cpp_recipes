@@ -3549,7 +3549,7 @@ We also want the window to cover the entire screen that Photoshop is on. Thus:
 	AdjustWindowRectEx(&clientRect, WS_POPUP, FALSE, WS_EX_LAYERED);
 ```
 
-## Drawing the GUI ##
+## Drawing to the window ##
 
 This isn't a tutorial on the graphics pipeline, so I'm making use of Direct3D 11
 here to handle the draw; I recommend you either do the same or, if you're
@@ -3557,6 +3557,21 @@ familiar with Direct3D 12, to make use of that instead. Either way, the main
 render loop looks like this:
 
 ```cpp
+#define GUI_ACCEPT 1
+#define GUI_REJECT 0
+
+struct GUIResult
+{
+	char *exportPath;
+	int8_t accepted;
+	int width;
+	int height;
+	int jpgQuality;
+};
+
+// ....more code here that eventually calls our filter GUI function and passes
+// in a pointer to a GUIResult struct
+
 	static bool shouldShowWindow = true;
 
 	MSG msg;
@@ -3620,6 +3635,47 @@ render loop looks like this:
     rendering context. Again, I am not focusing on how to work with DX11 or how
     the graphics pipeline works. If you're more familiar with OpenGL, you are
     welcome to use that instead for drawing as well.
+
+If you're a little eagle-eyed here, you'll notice something that might seem a
+liitle odd:
+
+```cpp
+				if (ImGui::Button("Cancel")) {
+					uiResult->accepted = GUI_REJECT;
+					shouldShowWindow = false;
+				}
+```
+
+Why am I doing something like this here instead of just `break`ing out of the
+loop?
+
+Well, for some reason, if you do that, you'll segfault Photoshop after, along
+with inducing other weird behaviours (like MessageBoxA windows no longer
+appearing and always returning an ID that indicates you accepted the dialogs). I
+haven't quite tracked down why this happens, honestly, but it looks like doing
+that causes Photoshop to eventually look up a `NULL` pointer when unwinding the
+stack after exiting and un-loading your plug-in. The only way to avoid this, as
+far as I can tell, is to let the render loop finish and swap the framebuffer,
+_then_ send the `WM_CLOSE` message to the window and let the window procedure
+handle the rest (you can still do things like prompt for close confirmation in
+your window procedure, if you so desire).
+
+The rest of this is just cleanup, which shouldn't be any big surprise.
+
+```cpp
+	ImGui_ImplDX11_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
+
+	CleanupD3D11Device();
+	DestroyWindow(guiHWnd);
+	UnregisterClassA(windowClass.lpszClassName, windowClass.hInstance);
+```
+
+And that's it! I know this was a little fast for those of you who are not
+innately familiar with ImGui or Win32 programming, so again, please check the
+repository for the full source code if you're stuck or having a hard time trying
+to figure out which code goes where.
 
 
 # Closing thoughts #
