@@ -3439,6 +3439,11 @@ Section Recipe: Using Automation plug-ins to call filters, so make sure you've
 gone over that one first and have the code ready. Alternatively, you can use the
 code in the accompanying code repository as a starting guide.
 
+!!! note Don't forget!
+    If you're going to re-use the code from earlier, remember to re-generate the
+    UUIDs and change the identifiers for the new plug-in. Photoshop isn't going
+    to like it if you have two plug-ins that look the same to it.
+
 ## The trick behind the curtain ##
 
 There is none, really. What we're going to do to mimic the look of having ImGui
@@ -3569,6 +3574,8 @@ struct GUIResult
 	int jpgQuality;
 };
 
+static float gD3D11ClearColor[4] = {0.0f, 1.0f, 0.0f, 1.0f};
+
 // ....more code here that eventually calls our filter GUI function and passes
 // in a pointer to a GUIResult struct
 
@@ -3671,6 +3678,11 @@ The rest of this is just cleanup, which shouldn't be any big surprise.
 	DestroyWindow(guiHWnd);
 	UnregisterClassA(windowClass.lpszClassName, windowClass.hInstance);
 ```
+
+Once done, go ahead and launch your plug-in within Photoshop. You should see
+your ImGui window show up:
+
+![ImGui Window][https://raw.githubusercontent.com/sonictk/ps_cpp_recipes/master/recipes/5_imgui_tool/resources/imgs/preview.png]
 
 And that's it! I know this was a little fast for those of you who are not
 innately familiar with ImGui or Win32 programming, so again, please check the
