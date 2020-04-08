@@ -122,7 +122,7 @@ LRESULT WINAPI GUIWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		}
 		return 0;
 	case WM_CLOSE:
-		// TODO: (yliangsiew) Show confirmation dialog.
+		// TODO: (sonictk) Show confirmation dialog.
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -181,7 +181,7 @@ void displayFilterGUIWithResult(HWND parentPSWindow, GUIResult *uiResult)
 								  NULL); // NOTE: (sonictk) No additional data needed
 	assert(guiHWnd != NULL);
 
-	// NOTE: (yliangsiew) Fake transparency for the window
+	// NOTE: (sonictk) Fake transparency for the window
 	SetLayeredWindowAttributes(guiHWnd, RGB(0,255,0), 0, LWA_COLORKEY);
 
 	if (!CreateD3D11Device(guiHWnd)) {
@@ -215,7 +215,7 @@ void displayFilterGUIWithResult(HWND parentPSWindow, GUIResult *uiResult)
 			continue;
 		}
 
-		// NOTE: (yliangsiew): For some reason, any interaction
+		// NOTE: (sonictk): For some reason, any interaction
 		// with imgui widgets of any sort will cause Photoshop to crash later on
 		// after both filters have returned. Something is setting some function pointer
 		// to 0, and I don't know what. Therefore, this crazy workaround is in-place that
@@ -236,7 +236,6 @@ void displayFilterGUIWithResult(HWND parentPSWindow, GUIResult *uiResult)
 			if (shouldShowWindow) {
 				ImGui::Begin("Export Options", NULL, imGuiWndFlags);
 
-				// TODO: (sonictk) Implement exporter options that feed back to the filter.
 				ImGui::InputInt("Width", &(uiResult->width), 1, INT_MAX);
 				ImGui::InputInt("Height", &(uiResult->height), 1, INT_MAX);
 				ImGui::SliderInt("Quality", &(uiResult->jpgQuality), 1, 100);
