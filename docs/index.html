@@ -22,6 +22,10 @@ the following topics:
 * Communicating between a traditional CEP panel in Photoshop and a native C++
   plugin using Adobe native CSXS events;
 
+* Creating your own GUIs directly without going through CEP. In this tutorial,
+  I'll be focusing on using Dear ImGui (https://github.com/ocornut/imgui) since
+  it's quickly becoming the most ubiquitous UI framework out available for use.
+
 Some of these recipes are already in the samples included in the SDK, but
 they're pretty obtuse and not necessarily implemented in an easy-to-understand
 manner (at least, it took me a while to grok them). Hopefully the recipes here
@@ -3405,6 +3409,275 @@ Again, if you need additional help or have trouble grokking this, the full
 source code for both the panel and the native plug-in are available in the [repository](https://github.com/sonictk/ps_cpp_recipes).
 
 
+# Recipe: Custom UI for plug-ins using ImGui #
+
+I decided to add one more recipe here since this is something that I've seen
+some people express interest in learning more about, and I haven't seen any
+other company attempt this yet in their Photoshop tooling (if any exists in the
+first place at all to begin with). If you're a seasoned Photoshop user, you're
+no doubt aware that certain filter plug-ins have their own UIs to allow you to
+tweak settings, sometimes even with an interactive document preview, before
+applying the filter to the image pixels themselves (the Liquify filter is an
+example of this).
+
+Here, I'm going to show you how to incorporate a UI for your own filter plugins,
+albeit a fairly simplistic one using [Dear ImGui](https://github.com/ocornut/imgui).
+
+!!! note Why Dear ImGui and not Qt, WPF, WinUI, etc.
+    I've tried all of them and trust me, apart from ImGui
+    and [Nuklear](https://github.com/Immediate-Mode-UI/Nuklear), I don't see
+    myself ever using anything else in the near future. The topic of GUI and the
+    idea of designing immediate/retained-mode GUIs should probably be reserved
+    for another time, but you can
+    watch [Casey Muratori's](https://www.youtube.com/watch?v=Z1qyvQsjK5Y) video
+    on the topic.
+
+## Additional Requirements ##
+
+Obviously, you're going to need ImGui. We'll also be basing this recipe off
+Section Recipe: Using Automation plug-ins to call filters, so make sure you've
+gone over that one first and have the code ready. Alternatively, you can use the
+code in the accompanying code repository as a starting guide.
+
+## The trick behind the curtain ##
+
+There is none, really. What we're going to do to mimic the look of having ImGui
+integration in Photoshop is as simple as this:
+
+1. Create a new window that is fullscreen and transparent.
+2. Create a Direct3D context for that window to be able to use the GPU to draw
+   onto it (it doesn't matter, really, you could use GDI if you really wanted
+   to. In this case we're going to use D3D11.)
+3. Draw ImGui to that window. Remember, we're still on the main Photoshop
+   thread, so we're still fulfilling the rule that our plug-in should be
+   modal. By making the window fullscreen as well, we prevent Photoshop from
+   taking any window messages from the Windows queue that could potentially be
+   processed as well.
+4. Profit.
+
+As you can see, this is absurdly simple and should be pretty obvious to anyone
+with even a modicum of Win32 programming experience. However, there is a single
+gotcha when implementing this, which I'll be getting to in a bit.
+
+!!! note I'm a little lost...
+    This isn't a Win32 programming tutorial, so I'm not posting the full window
+    creation code, along with the message loop here. If you'd like a full
+    example, look in the [repository](https://github.com/sonictk/ps_cpp_recipes)
+    for the `tutorial_imgui_gui_win32_d3d11.cpp` file that contains the
+    windowing and GUI-specific code to see how it's done.
+
+## Creating a transparent window ##
+
+We're going to take the route of least resistance here and make use of
+[Layered Windows](https://docs.microsoft.com/en-us/windows/win32/winmsg/window-features#layered-windows)
+to help create our window transparency. The key here is to make sure that when
+we create the window, that we use the extended window style `WS_EX_LAYERED` and
+make use of `SetLayeredWindowAttributes` to set the `LWA_COLORKEY` attribute,
+like so:
+
+```cpp
+	HWND guiHWnd = CreateWindowEx(WS_EX_LAYERED,
+								  GUI_WNDCLASS_NAME,
+								  GUI_WNDTTILE,
+								  WS_POPUP,
+								  monitorInfo.rcMonitor.left,
+								  monitorInfo.rcMonitor.top,
+								  clientRect.right - clientRect.left,
+								  clientRect.bottom - clientRect.top,
+								  parentPSWindow,
+								  NULL,
+								  windowClass.hInstance,
+								  NULL);
+	SetLayeredWindowAttributes(guiHWnd, RGB(0,255,0), 0, LWA_COLORKEY);
+```
+
+Yep, we're using pure green as our color key; this means that any time we draw
+the colour green, Windows will treat that as a transparent pixel and draw the
+underlying pixels of the other windows lower in the Z-order instead. Therefore,
+later when we start drawing into our window, all we have to do is make sure that
+we draw using that colour on areas of the window that are _not_ our ImGui
+widget, and we'll have window transparency!
+
+We're also going to set the Photoshop main window as our parent window here, so
+that it can take ownership of our ImGui tool window. Unfortunately, becuase the
+Photoshop UI itself is composed of a bunch of floating windows as well, finding
+the top-level parent window is a bit of a pain:
+
+```cpp
+static HWND globalPSMainWindowHwnd = NULL;
+static const char GLOBAL_PS_WIN32_WINDOW_CLASS_NAME[] = "Photoshop";
+
+BOOL CALLBACK getPSMainWindowCB(HWND hwnd, LPARAM)
+{
+	char windowClassName[WIN32_MAX_CLASS_NAME_LENGTH];
+	GetClassNameA(hwnd, (LPSTR)windowClassName, WIN32_MAX_CLASS_NAME_LENGTH);
+
+	if (strncmp(windowClassName, GLOBAL_PS_WIN32_WINDOW_CLASS_NAME, WIN32_MAX_CLASS_NAME_LENGTH) == 0) {
+		globalPSMainWindowHwnd = hwnd;
+	}
+
+	return TRUE;
+}
+
+HWND getPSMainWindow()
+{
+	BOOL status = EnumWindows(getPSMainWindowCB, (LPARAM)NULL);
+	if (status == 0) {
+		globalPSMainWindowHwnd = NULL;
+	}
+
+	return globalPSMainWindowHwnd;
+}
+```
+
+If there's a better way to do this (possibly from the PS SDK itself that I might
+have missed?), I'd love to know. But for now, this seems to work.
+
+We also want the window to cover the entire screen that Photoshop is on. Thus:
+
+```cpp
+	HMONITOR hMonitor = MonitorFromWindow(parentPSWindow, MONITOR_DEFAULTTONEAREST);
+	MONITORINFOEX monitorInfo;
+	ZeroMemory(&monitorInfo, sizeof(monitorInfo));
+	monitorInfo.cbSize = sizeof(monitorInfo);
+	GetMonitorInfo(hMonitor, &monitorInfo);
+
+	gGUIWidth = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
+	gGUIHeight = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
+
+	RECT clientRect = {0, 0, gGUIWidth, gGUIHeight};
+	AdjustWindowRectEx(&clientRect, WS_POPUP, FALSE, WS_EX_LAYERED);
+```
+
+## Drawing to the window ##
+
+This isn't a tutorial on the graphics pipeline, so I'm making use of Direct3D 11
+here to handle the draw; I recommend you either do the same or, if you're
+familiar with Direct3D 12, to make use of that instead. Either way, the main
+render loop looks like this:
+
+```cpp
+#define GUI_ACCEPT 1
+#define GUI_REJECT 0
+
+struct GUIResult
+{
+	char *exportPath;
+	int8_t accepted;
+	int width;
+	int height;
+	int jpgQuality;
+};
+
+// ....more code here that eventually calls our filter GUI function and passes
+// in a pointer to a GUIResult struct
+
+	static bool shouldShowWindow = true;
+
+	MSG msg;
+	ZeroMemory(&msg, sizeof(msg));
+	while (msg.message != WM_QUIT) {
+		if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE)) {
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+			continue;
+		}
+
+		if (!shouldShowWindow) {
+			PostMessage(guiHWnd, WM_CLOSE, 0, 0);
+		}
+
+		ImGui_ImplDX11_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
+		{
+			ImGui::SetNextWindowSize(gImGuiWndSize, ImGuiCond_Always);
+
+			static const ImGuiWindowFlags imGuiWndFlags = ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoCollapse;
+
+			if (shouldShowWindow) {
+				ImGui::Begin("Export Options", NULL, imGuiWndFlags);
+
+				ImGui::InputInt("Width", &(uiResult->width), 1, INT_MAX);
+				ImGui::InputInt("Height", &(uiResult->height), 1, INT_MAX);
+				ImGui::SliderInt("Quality", &(uiResult->jpgQuality), 1, 100);
+				ImGui::InputText("Export directory", uiResult->exportPath, PS_MAX_PATH);
+
+				ImGui::SetItemDefaultFocus();
+				if (ImGui::Button("Ok")) {
+					uiResult->accepted = GUI_ACCEPT;
+					shouldShowWindow = false;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel")) {
+					uiResult->accepted = GUI_REJECT;
+					shouldShowWindow = false;
+				}
+
+				ImGui::End();
+			}
+
+		}
+		ImGui::Render();
+
+		gD3D11DeviceContext->OMSetRenderTargets(1, &gD3D11MainRTV, NULL);
+		gD3D11DeviceContext->ClearRenderTargetView(gD3D11MainRTV, gD3D11ClearColor);
+		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+		gD3D11SwapChain->Present(1, 0);
+	}
+```
+
+!!! tip I don't understand where I should be typing this code! I need help!
+    Most of this code is straight from the D3D11 implementation that ships with
+    ImGui itself, so I recommend taking a look at it or the example in the
+    repository if you're unsure of what to do or how to set up a Direct 3D
+    rendering context. Again, I am not focusing on how to work with DX11 or how
+    the graphics pipeline works. If you're more familiar with OpenGL, you are
+    welcome to use that instead for drawing as well.
+
+If you're a little eagle-eyed here, you'll notice something that might seem a
+liitle odd:
+
+```cpp
+				if (ImGui::Button("Cancel")) {
+					uiResult->accepted = GUI_REJECT;
+					shouldShowWindow = false;
+				}
+```
+
+Why am I doing something like this here instead of just `break`ing out of the
+loop?
+
+Well, for some reason, if you do that, you'll segfault Photoshop after, along
+with inducing other weird behaviours (like MessageBoxA windows no longer
+appearing and always returning an ID that indicates you accepted the dialogs). I
+haven't quite tracked down why this happens, honestly, but it looks like doing
+that causes Photoshop to eventually look up a `NULL` pointer when unwinding the
+stack after exiting and un-loading your plug-in. The only way to avoid this, as
+far as I can tell, is to let the render loop finish and swap the framebuffer,
+_then_ send the `WM_CLOSE` message to the window and let the window procedure
+handle the rest (you can still do things like prompt for close confirmation in
+your window procedure, if you so desire).
+
+The rest of this is just cleanup, which shouldn't be any big surprise.
+
+```cpp
+	ImGui_ImplDX11_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
+
+	CleanupD3D11Device();
+	DestroyWindow(guiHWnd);
+	UnregisterClassA(windowClass.lpszClassName, windowClass.hInstance);
+```
+
+And that's it! I know this was a little fast for those of you who are not
+innately familiar with ImGui or Win32 programming, so again, please check the
+repository for the full source code if you're stuck or having a hard time trying
+to figure out which code goes where.
+
+
 # Closing thoughts #
 
 It's been a pretty long road to get to the end, but hopefully by now you should
@@ -3429,6 +3702,8 @@ If you see any errors or have any questions about this tutorial, feel free to
 * [Morgan Mcguire](https://casual-effects.com/markdeep/), for the Markdeep format.
 
 * Aras Pranckevicius, for writing the original Markdeep theme used in this tutorial.
+
+* Omar Cornut, for writing Dear ImGui.
 
 <style class="fallback">body{visibility:hidden}</style><script>markdeepOptions={tocStyle:'medium'};</script>
 <!-- Markdeep: --><script src="https://casual-effects.com/markdeep/latest/markdeep.min.js?" charset="utf-8"></script>
